@@ -1,0 +1,287 @@
+# Beneath a Steel Sky (CD v0.0372), from the restart point to Foster's
+# first entry into the LINC. Run with
+#   typosky walk walkthrough/to-linc.txt --until-linc
+#
+# Follows M. Shaw's walkthrough (Game Bytes Magazine issue 21, 1994,
+# www.ibiblio.org/GameBytes/issue21/misc/bass.html), checked against
+# "The Complete Beneath A Steel Sky Walkthrough" (FOURTYoz, Hitiek, Red,
+# OLiVER, 1994; bearstrong.net/tekst97/data/spill/bass/) where Shaw is
+# vague. Object names, dialogue lines and the order of things are the
+# ones the game actually shows (found with the hotspots step).
+#
+# Steps: look/use/take/talk/exit <thing>, use <item> on <thing>,
+# choose <part of a line>, waitfor/waitgone <thing>, wait <cycles>,
+# settle, save <slot> <name>. See src/walk.rs.
+
+# --- The factory walkway ------------------------------------------------
+use rung                          # the loose rung of the ladder: a metal bar
+use metal bar on door             # prise it open; the guard follows, gives up
+use door
+exit exit                         # back into the factory
+use stairs                        # down to the factory floor
+exit exit                         # east, to the transporter room
+
+# --- Joey and the transporter -------------------------------------------
+look @robot_shell                 # "Junk" until looked at
+use circuit board on robot shell  # Joey lives again, as a cleaning droid
+look transporter                  # so Foster can ask Hobbins about it
+use elevator                      # the alarm brings Hobbins out...
+exit @right_exit_rm2              # ...and his workshop is empty for a moment
+use cupboard door
+take wrench
+expect item wrench
+talk man                          # Hobbins, back from the alarm
+choose where am i
+choose best way out
+choose so how do i get
+choose how come your elevator
+choose what's wrong with the transporter
+choose get on with my inspection
+exit exit
+waitfor joey
+talk joey
+choose start that transporter     # Joey gives it a jump-start
+click 230 140 left                # out of the transporter's way
+waitgone @top_lift                # it lowers a barrel on the elevator...
+use hole                          # ...and Foster climbs down the shaft
+
+# --- The furnace: Reich ---------------------------------------------------
+look lock
+waitfor joey
+talk joey
+choose can you open that door     # Reich comes in, and dies in the furnace
+use corpse                        # his ID card and dark glasses
+talk joey                         # wake Joey up
+exit exit
+save 1 Top level walkway
+
+# --- Lamb's factory: Anita, the wrench in the cogs, Joey's welder shell --
+exit @right_exit_s6
+exit @factory_entry
+talk woman                        # Anita
+choose what are you doing
+choose ground level
+choose security been              # Lamb sends her off and throws Foster out
+choose safety inspector
+exit @factory_entry               # straight back in
+exit @fact1_right_exit
+use wrench on cogs                # production stops
+choose no technician
+choose don't know anything
+take wrench jammed
+expect item wrench
+exit @fact2_exit_left
+use wrench on robot               # loosen the welder's shell
+waitfor joey
+talk joey
+choose new shell                  # Joey moves into the welder
+
+# --- The storeroom: putty ----------------------------------------------
+exit @fact1_right_exit
+look window
+waitfor joey
+talk joey
+choose never mind
+use @fact2_store_exit             # robots only: Foster stays out
+talk joey
+choose check out the storeroom
+waitgone joey
+waitfor joey
+settle
+talk joey
+choose find anything useful       # a fuse box for the alarm
+talk joey
+choose disable the fuse box
+waitgone joey
+waitfor joey
+settle
+exit @fact2_store_exit
+use gangway
+take putty
+expect item putty
+exit exit                         # Potts searches Foster, keeps the glasses
+choose not a criminal
+
+# --- The power station: light bulb, and power for the elevator ----------
+exit @fact2_exit_left
+exit @factory_exit
+exit @left_exit_s7
+exit @left_exit_s6
+exit @left_exit_s5
+use wrench on @left_skull          # loosen both buttons
+use wrench on @right_skull
+use @left_skull                   # stand by the left one
+waitfor joey
+settle
+talk joey
+choose button on the right        # Joey takes the right one...
+use @left_skull                   # ...both at once: the pipe bursts, the man leaves
+use @power_switch                 # power off
+take light bulb
+expect item light bulb
+use putty on @socket
+use @power_switch                 # the putty blows the bars open
+use @right_lever                  # both switches down
+
+# --- Down to the second level --------------------------------------------
+exit @right_exit_s18
+exit @right_exit_s5
+exit @right_exit_s6
+look cable
+waitfor joey
+settle
+talk joey
+choose welding                    # Foster is in the way the first time
+click 120 150 left
+talk joey
+choose welding                    # Joey cuts the cable
+use id card on slot
+use elevator
+wait 40                           # Joey floats out of the lift first, and blocks the way
+take cable
+expect item cable
+save 2 Second level, cable taken
+
+# --- Reich's flat: the magazine; the travel agent: the ticket -----------
+exit @left_exit_29
+exit @up_exit_28
+use id card on @reich_slot
+use @reich_door_20
+use pillow
+take magazine
+expect item magazine
+exit exit
+exit @down_exit_20
+exit @right_exit_28
+exit @right_exit_29
+exit @travel_exit_23
+talk man
+choose difference between grand
+choose don't want to go
+give magazine to man
+talk man
+choose mystery tour
+choose clue
+choose economy tour               # and he swaps the ticket for the magazine
+choose doesn't matter
+take ticket
+expect item ticket
+
+# --- Lamb: the ticket for a factory tour --------------------------------
+exit @left_exit_24
+exit @left_exit_23
+exit @left_exit_29
+exit @up_exit_28
+click 260 175 left                # out of the way of Lamb, who comes this way
+waitfor lamb
+give ticket to lamb               # before he goes into his flat
+exit @down_exit_20
+exit @right_exit_28
+use id card on slot
+use elevator
+wait 40
+exit @factory_entry
+waitfor lamb
+settle
+talk lamb
+choose tour you promised          # the tour ends at the cogs; Lamb storms off
+
+# --- Anita: the jammer, LINC-space and the Schriebmann port -------------
+exit @fact2_exit_right
+talk anita
+choose what are you doing now
+choose council
+choose what's a d-linc
+choose have to get to ground level
+choose what's a jammer
+give id card to anita
+talk anita
+choose how come you were made
+choose linc-space
+choose jammer get me into
+choose schriebmann port
+choose internal security
+choose see you later
+save 3 Jammer from Anita
+# test stops here (src/walk.rs runs the script this far)
+
+# --- Burke: the Schriebmann port ---------------------------------------
+exit @fact3_exit_left
+exit @fact2_exit_left
+exit @factory_exit
+waitfor joey                      # Joey must be here to ride the lift with Foster
+settle
+use id card on slot
+use elevator
+wait 40
+exit @left_exit_29
+exit @left_exit_28
+exit @left_exit_19
+talk projector
+choose want a schriebmann
+waitfor joey
+settle
+talk joey
+choose talking to that hologram
+choose natural charm
+waitgone @bio_door
+exit @left_exit_26
+talk burke                        # no parts, no port
+wait 200
+talk burke
+choose spare a lung
+talk burke
+choose kidney                     # no good either
+talk burke                        # the testes, after Foster's death: the port is fitted
+talk burke
+choose ground level, doc          # his friend Willy, the insurance man
+choose thanks again
+save 4 Schriebmann port fitted
+
+# --- Anchor's insurance office: the grappling hook ----------------------
+exit @right_exit_27
+exit @right_exit_26
+exit @right_exit_19
+exit @right_exit_28
+exit @right_exit_29
+exit @anchor_exit_23
+waitfor joey
+settle
+talk joey
+choose interface with that computer
+choose asking you to do it
+talk man
+choose joey would never
+choose not interested
+talk man
+choose special policies
+choose doctor burke               # Anchor goes to make a call
+talk joey
+choose welder on that statue
+take anchor
+use anchor on cable
+expect item grappling hook
+save 5 Grappling hook made
+
+# --- Across to Security Services, and into the LINC ---------------------
+exit @anchor_exit_25
+exit @left_exit_23
+waitfor joey
+settle
+use id card on slot
+use elevator
+wait 40
+exit @left_exit_s7
+exit @left_exit_s6
+exit @security_exit
+use stairs
+exit @door                        # the ledge where Foster escaped the guard
+use grappling hook on sign        # through the window
+exit @right_exit_11
+save 6 Security Services, at the interface
+use id card on @pod_light
+use interface
+settle
+expect room 90
+save 7 In the LINC, first time
+frame linc-first-entry

@@ -4,6 +4,7 @@ mod engine;
 mod music_tool;
 mod term;
 mod tools;
+mod walk;
 
 use std::path::PathBuf;
 
@@ -68,6 +69,7 @@ fn main() {
         Some("probe") => tools::probe(&data_dir(), &args[1..]),
         Some("text") => tools::text(&data_dir(), &args[1..]),
         Some("monkey") => tools::monkey(&data_dir(), &args[1..]),
+        Some("walk") => walk::walk(&data_dir(), &args[1..]),
         Some("modes") => tools::modes(&args[1..]),
         None | Some("play") | Some("--skip-intro") | Some("--mute") => play(&args),
         Some("sfx") => audio_tools::sfx(&data_dir(), &args[1..]),
@@ -80,6 +82,7 @@ fn main() {
        typosky look <room> <braille|half> <cols> <rows> [out dir]
        typosky headless [--intro|--floppy] [--every-ms=N] [--skip-at=N] <cycles> [every] [out dir] [cycle:x,y[,button] ...]
        typosky text <number> ...
+       typosky walk <script> [--until-linc] [--load=save] [--from=line] [--save-at=line:slot] [--frames=dir] [--saves=dir]
        typosky sfx <fx 256-394 | section:sound> [room] [--wav out.wav]
        typosky speech <text number> [--wav out.wav]
        typosky music <section> <song> [seconds] [out.wav]"

@@ -173,7 +173,12 @@ impl Sky {
 
     pub fn restore_game(&mut self, slot: u16) -> Result<(), String> {
         let data = fs::read(Self::slot_path(slot)).map_err(|e| e.to_string())?;
-        self.parse_save_data(&data)?;
+        self.restore_data(&data)
+    }
+
+    /// Restores a game from save data, as from a slot, and redraws.
+    pub fn restore_data(&mut self, data: &[u8]) -> Result<(), String> {
+        self.parse_save_data(data)?;
         self.sys.past_intro = true;
         self.screen.current.iter_mut().for_each(|p| *p = 0);
         self.show_current();

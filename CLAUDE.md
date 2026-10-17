@@ -98,6 +98,13 @@ included.
   (see `typosky help`). `headless 600 1 out 5:23,70,1` plays scripted
   clicks (cycle:x,y,button; button 0 moves only) and saves frames.
   `tools/ansi2png.py` turns a `tmux capture-pane -e -p` into a PNG.
+- Walkthrough driver (src/walk.rs): `typosky walk walkthrough/to-linc.txt
+  --until-linc` plays a script of steps (`use metal bar on door`, `talk
+  joey`, `choose transporter` ...) headless in about a second, printing a
+  transcript, and writes its saves to `walkthrough/saves/` (SKY-VM.001 to
+  .007, from the walkway to the first LINC entry). `--load=<save>
+  --from=<line>` goes on from a save; `walkthrough/linc-ui.txt` tours the
+  LINC's pixel interface from save 7.
 - Data: `reference/bass-cd-1.2/` (gitignored), or `TYPOSKY_DATA`.
 - Session log: `RUST_LOG=debug typosky 2>typosky.log`.
 

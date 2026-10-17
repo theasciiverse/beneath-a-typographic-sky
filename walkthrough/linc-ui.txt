@@ -1,0 +1,35 @@
+# A look round the LINC's pixel interface, from save 7 (first entry):
+#   typosky walk walkthrough/linc-ui.txt --load=walkthrough/saves/SKY-VM.007 --frames=<dir>
+# Follows the first LINC visit of the walkthrough a little way (the ball,
+# the carpet bag, decompressing the data) and writes a frame at each sight.
+
+frame linc-01-room90
+hotspots
+point 160 0                       # the menu bar: LINC programs and data as icons
+frame linc-02-menu-bar
+hotspots
+texts
+point 200 140
+look ball                         # left click: the LINC Environment Manager panel
+frame linc-03-info-panel
+texts
+hotspots
+use @info_button                  # the panel's only button closes it
+take ball
+use info on document              # INFO on a menu item: the same panel
+frame linc-04-info-document
+texts
+use @info_button
+exit @door_r90
+frame linc-05-room91
+hotspots
+use open on carpet bag
+frame linc-06-bag-open
+hotspots
+take magnifying glass
+take birthday surprise
+use decompress on compressed data
+point 160 0
+frame linc-07-menu-programs
+hotspots
+texts

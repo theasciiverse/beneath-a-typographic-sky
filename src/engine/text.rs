@@ -133,7 +133,8 @@ impl Sky {
         let Some(data) = self.items[slot].as_ref() else {
             return b"???".to_vec();
         };
-        let le16 = |at: usize| u16::from_le_bytes([data[at], data[at + 1]]) as u32;
+        let byte = |at: usize| data.get(at).copied().unwrap_or(0);
+        let le16 = |at: usize| u16::from_le_bytes([byte(at), byte(at + 1)]) as u32;
 
         let mut offset = 0u32;
         let block_nr = nr & 0xFE0;
@@ -148,7 +149,7 @@ impl Sky {
         if msg != 0 {
             let mut bp = (block_nr + le16(0)) as usize;
             while msg > 0 {
-                let mut skip = data[bp] as u32;
+                let mut skip = byte(bp) as u32;
                 bp += 1;
                 if skip & 0x80 != 0 {
                     skip &= 0x7F;
@@ -187,7 +188,9 @@ impl Sky {
                     break v;
                 }
             };
-            if ch == 0 {
+            // a text number past the end of its section decodes zeros for
+            // ever (ScummVM would read past the buffer); stop at the end
+            if ch == 0 || p >= data.len() {
                 break;
             }
             out.push(ch);
