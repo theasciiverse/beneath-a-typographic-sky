@@ -50,6 +50,8 @@ pub struct TermHost {
     texts: Vec<TextOverlay>,
     last_snapshot: Instant,
     pub audio: bool,
+    /// the game pointer as a glyph: mouse cell and character
+    pointer: Option<(u16, u16, char)>,
 }
 
 impl TermHost {
@@ -69,6 +71,7 @@ impl TermHost {
             texts: Vec::new(),
             last_snapshot: Instant::now(),
             audio: true,
+            pointer: None,
         };
         h.relayout();
         Ok(h)
@@ -201,10 +204,28 @@ impl TermHost {
         let l = self.layout;
         let cells = &self.cells;
         let texts = &self.texts;
+        let pointer = self.pointer;
         let _ = self.terminal.draw(|f| {
             let buf = f.buffer_mut();
             draw_cells(buf, l, cells);
             draw_texts(buf, l, texts);
+            if let Some((col, row, ch)) = pointer {
+                // just above and right of the terminal arrow's tip, which
+                // covers the cell it points at and the one below
+                let (x, y) = (col + 1, row.saturating_sub(1).max(l.y));
+                let area = buf.area;
+                if x < area.right() && y < area.bottom() {
+                    let cell = &mut buf[(x, y)];
+                    let under = match cell.bg {
+                        Color::Rgb(r, g, b) => Color::Rgb(r / 4, g / 4, b / 4),
+                        _ => Color::Black,
+                    };
+                    cell.set_char(ch)
+                        .set_fg(Color::Rgb(255, 214, 90))
+                        .set_bg(under)
+                        .set_style(Style::default().add_modifier(Modifier::BOLD));
+                }
+            }
         });
     }
 
@@ -375,6 +396,10 @@ fn draw_button(buf: &mut Buffer, l: Layout, t: &TextOverlay, h: u16) {
         }
     }
     let label = t.lines.first().map(String::as_str).unwrap_or("");
+    if label == "◀" || label == "▶" {
+        draw_arrow(buf, (x0 + 1, y0 + 1, x1 - 1, y1 - 1), label == "◀", fg, bg);
+        return;
+    }
     let n = label.chars().count() as i32;
     let lx = x0 + ((x1 - x0 + 1) - n) / 2;
     let ly = (y0 + y1) / 2;
@@ -383,6 +408,64 @@ fn draw_button(buf: &mut Buffer, l: Layout, t: &TextOverlay, h: u16) {
         if inside(x, ly) && x > x0 && x < x1 {
             buf[(x as u16, ly as u16)].set_char(ch).set_fg(fg).set_bg(bg).set_style(Style::default().add_modifier(Modifier::BOLD));
         }
+    }
+}
+
+/// A big triangle in half blocks filling the box (x0, y0, x1, y1),
+/// pointing left or right. Half blocks give two square-ish dots per cell.
+fn draw_arrow(buf: &mut Buffer, (x0, y0, x1, y1): (i32, i32, i32, i32), left: bool, fg: Color, bg: Color) {
+    let area = buf.area;
+    let (w, h) = (x1 - x0 + 1, (y1 - y0 + 1) * 2); // in half-block dots
+    if w < 2 || h < 2 {
+        return;
+    }
+    // leave a margin; half-block dots are about square, so an
+    // equilateral triangle is about 0.87 times as wide as it is tall
+    let th = (h - 2).max(2);
+    let tw = ((th as f32 * 0.87).round() as i32).min(w - 2).max(1);
+    let (ox, oy) = (x0 + (w - tw) / 2, (h - th) / 2);
+    let on = |dx: i32, dy: i32| -> bool {
+        // dy from 0..th, dx from 0..tw; the apex is at the pointing side
+        let half = th as f32 / 2.0;
+        let reach = tw as f32 * (1.0 - ((dy as f32 + 0.5) - half).abs() / half);
+        let d = if left { tw - 1 - dx } else { dx };
+        (d as f32) < reach
+    };
+    for cy in 0..(y1 - y0 + 1) {
+        for cx in 0..w {
+            let (x, y) = (x0 + cx, y0 + cy);
+            if x < area.left() as i32 || x >= area.right() as i32 || y < area.top() as i32 || y >= area.bottom() as i32 {
+                continue;
+            }
+            let dot = |half: i32| {
+                let (dx, dy) = (cx - (ox - x0), cy * 2 + half - oy);
+                dx >= 0 && dx < tw && dy >= 0 && dy < th && on(dx, dy)
+            };
+            let ch = match (dot(0), dot(1)) {
+                (true, true) => '█',
+                (true, false) => '▀',
+                (false, true) => '▄',
+                _ => ' ',
+            };
+            buf[(x as u16, y as u16)].set_char(ch).set_fg(fg).set_bg(bg).set_style(Style::default());
+        }
+    }
+}
+
+/// The glyph for each kind of game pointer (sky's MOUSE_* frames).
+fn pointer_glyph(c: &crate::engine::host::Cursor) -> Option<char> {
+    if !c.visible {
+        return None;
+    }
+    match c.kind {
+        0 => Some('◆'), // an object in hand
+        2 => Some('◷'), // disk: wait
+        3 => Some('↓'),
+        4 => Some('→'),
+        5 => Some('←'),
+        7 => Some('+'), // over something
+        8 => Some('↑'),
+        _ => None, // 1 normal, 6 blank
     }
 }
 
@@ -424,7 +507,7 @@ impl Host for TermHost {
 
         // palette indices to colours, with the pointer on top
         let pal = frame.palette;
-        let mut px: Vec<Rgb> = frame
+        let px: Vec<Rgb> = frame
             .pixels
             .iter()
             .map(|&p| {
@@ -432,24 +515,14 @@ impl Host for TermHost {
                 [pal[i], pal[i + 1], pal[i + 2]]
             })
             .collect();
-        let c = frame.cursor;
-        if c.visible {
-            for cy in 0..c.height as i32 {
-                for cx in 0..c.width as i32 {
-                    let p = *c.pixels.get((cy * c.width as i32 + cx) as usize).unwrap_or(&0);
-                    if p == 0 {
-                        continue;
-                    }
-                    let x = frame.mouse_x as i32 - c.hot_x as i32 + cx;
-                    let y = frame.mouse_y as i32 - c.hot_y as i32 + cy;
-                    if (0..GAME_W as i32).contains(&x) && (0..GAME_H as i32).contains(&y) {
-                        let i = p as usize * 3;
-                        px[y as usize * GAME_W + x as usize] = [pal[i], pal[i + 1], pal[i + 2]];
-                    }
-                }
-            }
-        }
+        // The game's pointer as one glyph in type (David, 2026-10-17);
+        // none over plain floor, where the terminal's own arrow serves.
         let l = self.layout;
+        self.pointer = pointer_glyph(frame.cursor).map(|ch| {
+            let col = l.x as u32 + frame.mouse_x as u32 * l.cols as u32 / GAME_W as u32;
+            let row = l.y as u32 + frame.mouse_y as u32 * l.rows as u32 / GAME_H as u32;
+            (col as u16, row as u16, ch)
+        });
         self.cells = raster::render(&Image { w: GAME_W, h: GAME_H, px: &px }, l.mode, l.cols as usize, l.rows as usize);
         self.texts = frame
             .texts
