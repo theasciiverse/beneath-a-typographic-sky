@@ -166,13 +166,17 @@ impl TermHost {
         let deadline = Instant::now() + wait;
         loop {
             let left = deadline.saturating_duration_since(Instant::now());
-            match event::poll(left) {
-                Ok(true) => {
-                    if let Ok(ev) = event::read() {
-                        self.handle(ev);
-                    }
+            match event::poll(left).and_then(|ready| if ready { event::read().map(Some) } else { Ok(None) }) {
+                Ok(Some(ev)) => self.handle(ev),
+                Ok(None) => break,
+                Err(e) => {
+                    // the terminal is gone (closed window, killed tmux): quit
+                    // instead of running on with nobody to see it
+                    log::info!("terminal input failed, quitting: {e}");
+                    self.queue.push_back(HostEvent::Quit);
+                    std::thread::sleep(left.min(Duration::from_millis(50)));
+                    break;
                 }
-                _ => break,
             }
             if Instant::now() >= deadline {
                 break;
@@ -291,6 +295,10 @@ fn draw_texts(buf: &mut Buffer, l: Layout, texts: &[TextOverlay]) {
     let sx = l.cols as f32 / GAME_W as f32;
     let sy = l.rows as f32 / GAME_H as f32;
     for t in texts {
+        if let Some(h) = t.boxed {
+            draw_button(buf, l, t, h);
+            continue;
+        }
         let color = t.color_rgb;
         let lh = (t.line_height as f32 * sy).max(1.0);
         for (i, line) in t.lines.iter().enumerate() {
@@ -320,6 +328,47 @@ fn draw_texts(buf: &mut Buffer, l: Layout, texts: &[TextOverlay]) {
                 };
                 cell.set_char(ch).set_fg(rgb(color)).set_bg(rgb(under)).set_style(Style::default().add_modifier(Modifier::BOLD));
             }
+        }
+    }
+}
+
+/// A pixel button as a framed box with its label in type.
+fn draw_button(buf: &mut Buffer, l: Layout, t: &TextOverlay, h: u16) {
+    let area = buf.area;
+    let sx = l.cols as f32 / GAME_W as f32;
+    let sy = l.rows as f32 / GAME_H as f32;
+    let x0 = (t.x as f32 * sx).round() as i32 + l.x as i32;
+    let y0 = (t.y as f32 * sy).round() as i32 + l.y as i32;
+    let x1 = ((t.x + t.width as i32) as f32 * sx).round() as i32 + l.x as i32 - 1;
+    let y1 = ((t.y + h as i32) as f32 * sy).round() as i32 + l.y as i32 - 1;
+    let fg = rgb(t.color_rgb);
+    let bg = Color::Rgb(16, 18, 22);
+    let inside = |x: i32, y: i32| x >= area.left() as i32 && x < area.right() as i32 && y >= area.top() as i32 && y < area.bottom() as i32;
+    for y in y0..=y1 {
+        for x in x0..=x1 {
+            if !inside(x, y) {
+                continue;
+            }
+            let ch = match (x == x0, x == x1, y == y0, y == y1) {
+                (true, _, true, _) => '┌',
+                (_, true, true, _) => '┐',
+                (true, _, _, true) => '└',
+                (_, true, _, true) => '┘',
+                (_, _, true, _) | (_, _, _, true) => '─',
+                (true, _, _, _) | (_, true, _, _) => '│',
+                _ => ' ',
+            };
+            buf[(x as u16, y as u16)].set_char(ch).set_fg(fg).set_bg(bg).set_style(Style::default());
+        }
+    }
+    let label = t.lines.first().map(String::as_str).unwrap_or("");
+    let n = label.chars().count() as i32;
+    let lx = x0 + ((x1 - x0 + 1) - n) / 2;
+    let ly = (y0 + y1) / 2;
+    for (j, ch) in label.chars().enumerate() {
+        let x = lx + j as i32;
+        if inside(x, ly) && x > x0 && x < x1 {
+            buf[(x as u16, ly as u16)].set_char(ch).set_fg(fg).set_bg(bg).set_style(Style::default().add_modifier(Modifier::BOLD));
         }
     }
 }

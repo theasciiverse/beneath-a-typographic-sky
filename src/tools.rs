@@ -325,12 +325,28 @@ pub fn headless(dir: &Path, args: &[String]) {
     }
 }
 
-pub fn probe(dir: &Path, _args: &[String]) {
+pub fn probe(dir: &Path, args: &[String]) {
     use crate::engine::defs::*;
     use crate::engine::host::Headless;
     use crate::engine::sky::{f, Sky};
     let mut sky = Sky::new(dir, Box::new(Headless::new())).unwrap();
     sky.start(true);
+    // "die": walk down to the guard first, to probe the death screen
+    if args.first().map(String::as_str) == Some("die") {
+        for n in 0..600 {
+            if n == 10 || n == 11 || n == 13 {
+                sky.mouse_moved(60, 150);
+            }
+            if n == 10 {
+                sky.mouse.button_pressed(2);
+            }
+            sky.tick();
+            sky.delay(80);
+            if sky.vars[SCREEN as usize] == 102 {
+                break;
+            }
+        }
+    }
     macro_rules! v { ($n:expr) => { sky.vars[$n as usize] }; }
     println!("SCREEN {} LOGIC_LIST {:#x} SECTION {} LAYER0 {} pal {:#x} mouse_status {}", v!(SCREEN), v!(LOGIC_LIST_NO), v!(CUR_SECTION), v!(LAYER_0_ID), sky.sys.current_palette, v!(MOUSE_STATUS));
     for _ in 0..30 { sky.tick(); }

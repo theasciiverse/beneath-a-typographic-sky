@@ -447,6 +447,7 @@ impl Sky {
             color: 255,
             color_rgb: [0, 0, 0],
             centered: true,
+            boxed: None,
         };
         if let Some(old) = it.save_buf.take() {
             s.texts_shown.retain(|o| *o != old.overlay);

@@ -59,6 +59,8 @@ pub struct ScreenState {
     pub texts_shown: Vec<TextOverlay>,
     /// draw text sprites as pixels too (off when the terminal sets them as type)
     pub text_pixels: bool,
+    /// pixel buttons the terminal labels in type: compact start word to label
+    pub labels: std::collections::HashMap<usize, UiLabel>,
 }
 
 impl Default for ScreenState {
@@ -81,6 +83,7 @@ impl Default for ScreenState {
             texts_drawing: Vec::new(),
             texts_shown: Vec::new(),
             text_pixels: true,
+            labels: Default::default(),
         }
     }
 }
@@ -97,6 +100,14 @@ impl Sky {
         for i in 0..VGA_COLORS - GAME_COLORS {
             for c in 0..3 {
                 s.sys_pal[3 * GAME_COLORS + i * 3 + c] = vga(TOP_16_COLORS[i * 3 + c]);
+            }
+        }
+        // our addition: each labelled button gets its own pointer text
+        for &(id, area) in &UI_BUTTONS {
+            if let Some(c) = self.fetch(id) {
+                let text = self.g(c, f::CURSOR_TEXT) as u32;
+                let text: String = self.get_text(text).iter().map(|&b| super::text::font_char(b)).collect();
+                self.screen.labels.insert(c, UiLabel { text, area });
             }
         }
     }
@@ -656,6 +667,27 @@ impl Sky {
             return;
         }
 
+        // A pixel button: label it for the terminal.
+        if let Some(label) = s.labels.get(&c) {
+            let (x, y, w, bh) = label.area.unwrap_or((
+                xcood + h.offset_x as i32 - TOP_LEFT_X as i32,
+                ycood + h.offset_y as i32 - TOP_LEFT_Y as i32,
+                h.width,
+                h.height,
+            ));
+            s.texts_drawing.push(TextOverlay {
+                x,
+                y,
+                width: w,
+                line_height: bh,
+                lines: vec![label.text.clone()],
+                color: 255,
+                color_rgb: [0, 0, 0],
+                centered: true,
+                boxed: Some(bh),
+            });
+        }
+
         // A text sprite: remember its words for the terminal.
         let is_text = (FIRST_TEXT_BUFFER..=LAST_TEXT_BUFFER).contains(&item);
         if is_text {
@@ -669,6 +701,7 @@ impl Sky {
                     color: meta.color,
                     color_rgb: [0, 0, 0],
                     centered: meta.centered,
+                    boxed: None,
                 });
             }
         }
@@ -794,6 +827,23 @@ fn le16(d: &[u8], word: usize) -> u16 {
         Some(b) => u16::from_le_bytes([b[0], b[1]]),
         None => 0,
     }
+}
+
+/// Game objects that are buttons drawn as pixels, which the terminal
+/// labels in type, with the screen area the whole button covers (x, y,
+/// width, height) when that is more than the object's own sprite.
+/// The death screen's Restart, Restore game and Quit panels, measured
+/// from its background (room 102).
+const UI_BUTTONS: [(u32, Option<(i32, i32, u16, u16)>); 3] = [
+    (0xA2, Some((8, 168, 98, 24))),
+    (0xA4, Some((107, 168, 98, 24))),
+    (0xAF, Some((206, 168, 105, 24))),
+];
+
+/// A pixel button's label, and the area it covers if not its sprite's.
+pub struct UiLabel {
+    pub text: String,
+    pub area: Option<(i32, i32, u16, u16)>,
 }
 
 pub const FIRST_TEXT_BUFFER: u32 = 274;

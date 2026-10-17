@@ -42,6 +42,9 @@ pub struct TextOverlay {
     /// the colour itself, filled in by the front end
     pub color_rgb: [u8; 3],
     pub centered: bool,
+    /// Some(height in pixels): a pixel button, drawn as a framed box this
+    /// tall with the label in it
+    pub boxed: Option<u16>,
 }
 
 /// The mouse pointer as a small indexed sprite.
