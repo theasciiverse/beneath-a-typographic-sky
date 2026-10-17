@@ -52,6 +52,8 @@ pub struct TermHost {
     pub audio: bool,
     /// the game pointer as a glyph: mouse cell and character
     pointer: Option<(u16, u16, char)>,
+    /// set by SIGTERM, SIGHUP or SIGQUIT: quit (and so autosave) cleanly
+    signalled: std::sync::Arc<std::sync::atomic::AtomicBool>,
 }
 
 impl TermHost {
@@ -72,7 +74,17 @@ impl TermHost {
             last_snapshot: Instant::now(),
             audio: true,
             pointer: None,
+            signalled: Default::default(),
         };
+        // The first signal asks for a clean quit (with its autosave); a
+        // second one ends the game at once, so it can never hang a kill.
+        let mut sigs = signal_hook::consts::TERM_SIGNALS.to_vec();
+        #[cfg(unix)]
+        sigs.push(signal_hook::consts::SIGHUP);
+        for sig in sigs {
+            let _ = signal_hook::flag::register_conditional_shutdown(sig, 1, h.signalled.clone());
+            let _ = signal_hook::flag::register(sig, h.signalled.clone());
+        }
         h.relayout();
         Ok(h)
     }
@@ -180,6 +192,10 @@ impl TermHost {
     }
 
     fn pump(&mut self, wait: Duration) {
+        if self.signalled.load(std::sync::atomic::Ordering::Relaxed) {
+            log::info!("signal received, quitting");
+            self.queue.push_back(HostEvent::Quit);
+        }
         let deadline = Instant::now() + wait;
         loop {
             let left = deadline.saturating_duration_since(Instant::now());

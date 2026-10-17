@@ -2146,6 +2146,7 @@ dependencies = [
  "png",
  "ratatui",
  "rodio",
+ "signal-hook",
 ]
 
 [[package]]
