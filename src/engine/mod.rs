@@ -5,4 +5,5 @@
 pub mod cpt;
 pub mod defs;
 pub mod disk;
+pub mod music;
 pub mod rnc;

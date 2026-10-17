@@ -1,4 +1,5 @@
 mod engine;
+mod music_tool;
 mod term;
 mod tools;
 
@@ -17,8 +18,9 @@ fn main() {
     match args.first().map(String::as_str) {
         Some("dump") => tools::dump(&data_dir(), &args[1..]),
         Some("look") => tools::look(&data_dir(), &args[1..]),
+        Some("music") => music_tool::music(&data_dir(), &args[1..]),
         _ => {
-            eprintln!("usage: typosky dump <files|cpts|screens|rooms> [out dir]\n       typosky look <room> <braille|half> <cols> <rows> [out dir]");
+            eprintln!("usage: typosky dump <files|cpts|screens|rooms> [out dir]\n       typosky look <room> <braille|half> <cols> <rows> [out dir]\n       typosky music <section> <song> [seconds] [out.wav]");
             std::process::exit(2);
         }
     }
