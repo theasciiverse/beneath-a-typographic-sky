@@ -1,0 +1,19 @@
+[package]
+name = "typographic-sky"
+version = "0.1.0"
+edition = "2021"
+description = "Asciiverse port of Revolution Software's Beneath a Steel Sky (1994), the city rebuilt out of characters"
+license = "GPL-3.0-or-later"
+
+[[bin]]
+name = "typosky"
+path = "src/main.rs"
+
+[dependencies]
+ratatui = "0.30"
+log = "0.4"
+env_logger = "0.11"
+png = "0.17"
+
+[profile.release]
+debug = 1

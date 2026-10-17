@@ -1,0 +1,92 @@
+# Beneath a Typographic Sky
+
+Asciiverse point-and-click adventure. Rust + Ratatui + Drawille.
+Terminal take on Revolution Software's Beneath a Steel Sky (1994).
+
+**Status:** Created 2026-10-03 from design conversation. Design/ideation
+stage only. No code yet.
+
+## Name
+
+Beneath a Steel Sky → Beneath a Typographic Sky. The swap names the medium:
+the city of Union City rebuilt out of characters. It reads as a clear tribute
+and explains the concept without needing context.
+
+The title stays close to the original, so it depends on Revolution being
+comfortable with it. Cover the name explicitly in the outreach email.
+Collision check not yet done.
+
+## Source situation (verified 2026-10-03)
+
+- Revolution Software released the game as **freeware** in August 2003,
+  together with its original assembly source code.
+- Freeware is **not** public domain. Revolution still owns the copyright
+  (art, story, characters, name). Wikipedia notes the source code license
+  "does not qualify as a free software license."
+- ScummVM supports the game, and the freeware data files (CD and floppy
+  versions) are downloadable from scummvm.org.
+- License read 2026-10-17 (`reference/bass-cd-1.2/readme.txt`, from
+  downloads.scummvm.org `bass-cd-1.2.zip`, sha256
+  `53209b9400eab6fd7fa71518b2f357c8de75cfeaa5ba57024575ab79cc974593`,
+  matching the published .sha256). Its six clauses:
+  1. Free distribution on any medium, readme and notices intact.
+  2. A reasonable copying fee and inclusion in larger, possibly commercial
+     distributions are fine, with attribution and the readme intact.
+  3. No fee for the game itself.
+  4. **"You may modify the game as you wish"** and distribute modified
+     versions under the same terms, with a prominent notice that it is a
+     modified version.
+  5. All game content (C) Revolution Software Ltd.
+  6. As-is, no warranty.
+  The preamble adds: commercial adventure game collections should ask first.
+- Related: 2009 iOS remaster, and the sequel Beyond a Steel Sky (2020).
+
+## Legal approach (updated 2026-10-17 from the license above)
+
+- **Bundling the data files** with the engine: allowed (clauses 1 and 2),
+  keep readme.txt beside them. Asciiverse is free, so clause 3 is met.
+- **Converted or redrawn art we distribute:** allowed as a modified version
+  (clause 4), with a prominent "modified version" notice (title screen and
+  NOTICE file). The old note that this needed Revolution's approval was
+  wrong.
+- **Never sold.** If Asciiverse paid titles come later, this one stays free.
+- **The name:** the license says nothing about names or trademarks, so a
+  courtesy blessing from Revolution is still the right move before
+  announcing.
+
+## Rendering approach
+
+This is a bigger aesthetic leap than Another Rift. The source is dense,
+colourful pixel art, with backgrounds by comic artist Dave Gibbons, not
+vector polygons.
+
+- **Drawille (Braille sub-pixel):** backgrounds and sprites, converted from
+  bitmaps at runtime. Will likely need dithering, edge detection and
+  palette-to-contrast mapping to stay readable. Expect real iteration here.
+- **Ratatui:** the adventure UI. Verbs, inventory, dialogue and text are a
+  natural fit for a terminal, arguably more so than the visuals.
+- Consider colour terminals (truecolor Braille) vs monochrome as an option.
+
+## Outreach: Revolution Software (Charles Cecil)
+
+- **Why contact:** Courtesy at minimum, approval for the name and for any
+  converted art. Revolution released the game freely themselves and has a
+  fan-friendly reputation.
+- **The ask:** Blessing for the project and the name. Explain the runtime,
+  bring-your-own-data approach.
+- **Timing:** After a prototype rendering demo exists. Show, don't tell
+  (same principle as the rest of the outreach list).
+- **Status:** Not contacted yet. Email not drafted yet.
+
+## Open questions
+
+- [x] Read the license in the ScummVM download's readme.txt (2026-10-17)
+- [x] Bundle data files, or require players to download them? Bundling is
+      allowed; the CD data is 72 MB, so floppy (smaller) vs CD is the real
+      choice now
+- [ ] Bitmap-to-Braille conversion quality: prototype a few rooms first
+- [ ] Use ScummVM's engine (GPL) and the released source as technical
+      references for data formats and scripting
+- [ ] Voice/audio: the CD version has full speech. Keep, drop, or optional?
+- [ ] Name collision check before public announcement
+- [ ] Add to the Asciiverse outreach CLAUDE.md
