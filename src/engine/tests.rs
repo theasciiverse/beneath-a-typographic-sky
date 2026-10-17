@@ -114,3 +114,12 @@ fn out_of_range_texts_end() {
         assert!(t.len() < 1024, "text {nr} ran on for {} bytes", t.len());
     }
 }
+
+#[test]
+fn font_characters() {
+    use super::text::font_char;
+    let s: String = b"#ber<<UNKNOWN>>".iter().map(|&b| font_char(b)).collect();
+    assert_eq!(s, "überááUNKNOWNûû");
+    let s: String = [0x80u8, 0x80, b'O', b'K', 0x81, 0x81].iter().map(|&b| font_char(b)).collect();
+    assert_eq!(s, "<<OK>>");
+}

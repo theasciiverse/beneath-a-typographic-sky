@@ -71,6 +71,7 @@ fn main() {
         Some("monkey") => tools::monkey(&data_dir(), &args[1..]),
         Some("walk") => walk::walk(&data_dir(), &args[1..]),
         Some("modes") => tools::modes(&args[1..]),
+        Some("glyphs") => tools::glyphs(&data_dir(), &args[1..]),
         None | Some("play") | Some("--skip-intro") | Some("--mute") => play(&args),
         Some("sfx") => audio_tools::sfx(&data_dir(), &args[1..]),
         Some("speech") => audio_tools::speech(&data_dir(), &args[1..]),

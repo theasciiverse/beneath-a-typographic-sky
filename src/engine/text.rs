@@ -429,13 +429,40 @@ fn replace_all(text: &mut [u8], from: &[u8], to: &[u8]) {
     }
 }
 
-/// The character a byte of game text stands for. Bytes 0x80 and up are
-/// taken as code page 437 here; not yet checked against the font's glyphs
-/// (English text does not use them).
+/// The character a byte of game text stands for, read off the glyphs of
+/// the game's main and LINC fonts (files 60150 and 60521, which agree;
+/// `typosky glyphs` draws them). The fonts redraw some ASCII codes as
+/// accented letters, so German "#ber" is "über". Checked by eye
+/// 2026-10-17; 0x84, 0x9B and 0x9C are rare and their readings uncertain.
 pub fn font_char(b: u8) -> char {
-    if b < 0x80 {
-        return b as char;
+    // 0x80 to 0x9C; 0x9C looks like n with a circumflex, given as plain n
+    const HIGH: [char; 29] = [
+        '<', '>', '/', 'Å', 'Ä', 'å', 'É', 'í', 'ó', 'ë', '¿', '¡', 'Ñ', 'ñ', 'ì', 'ò', // 0x80
+        'Á', 'à', 'ù', 'Ó', 'æ', 'ã', 'Õ', 'õ', 'Ã', 'Ê', 'Ú', 'ń', 'n', // 0x90
+    ];
+    match b {
+        0x23 => 'ü',
+        0x28 => 'ß',
+        0x29 => 'ö',
+        0x2A => 'ä',
+        0x2B => 'é',
+        0x2F => 'ç',
+        0x3C => 'á',
+        0x3D => 'ê',
+        0x3E => 'û',
+        0x40 => 'ô',
+        0x5B => 'â',
+        0x5C => 'ú',
+        0x5D => 'è',
+        0x5E => 'Ç',
+        0x5F => 'î',
+        0x7B => 'ï',
+        0x7C => '´',
+        0x7D => 'Ü',
+        0x7E => 'Ä',
+        0x7F => 'Ö',
+        0x20..=0x7F => b as char,
+        0x80..=0x9C => HIGH[(b - 0x80) as usize],
+        _ => '?',
     }
-    const CP437_HIGH: &str = "ÇüéâäàåçêëèïîìÄÅÉæÆôöòûùÿÖÜ¢£¥₧ƒáíóúñÑªº¿⌐¬½¼¡«»";
-    CP437_HIGH.chars().nth((b - 0x80) as usize).unwrap_or('?')
 }

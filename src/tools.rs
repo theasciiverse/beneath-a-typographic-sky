@@ -476,3 +476,42 @@ pub fn modes(args: &[String]) {
     enc.set_depth(png::BitDepth::Eight);
     enc.write_header().unwrap().write_image_data(&flat).unwrap();
 }
+
+/// `typosky glyphs <out.png>`: the three game fonts' glyphs for bytes
+/// 0x20..0x9F, one font per row band, 16 glyphs per line, zoomed 4x.
+pub fn glyphs(dir: &Path, args: &[String]) {
+    let disk = Disk::open(dir).unwrap_or_else(|e| fail(&e.to_string()));
+    let fonts = [(60150u16, 12usize), (60521, 12), (60520, 12)];
+    let (gw, gh, z) = (16usize, 14usize, 4usize);
+    let lines = 8; // 128 glyphs / 16
+    let (w, h) = (16 * gw * z, fonts.len() * lines * gh * z);
+    let mut px = vec![[20u8, 20, 30]; w * h];
+    for (fi, &(file, height)) in fonts.iter().enumerate() {
+        let d = disk.load(file).unwrap();
+        for c in 0..128usize {
+            let base = 128 + height * 4 * c;
+            let (gx, gy) = (c % 16, fi * lines + c / 16);
+            for row in 0..height {
+                let be = |i: usize| u16::from_be_bytes([*d.get(i).unwrap_or(&0), *d.get(i + 1).unwrap_or(&0)]);
+                let (data, mask) = (be(base + row * 4), be(base + row * 4 + 2));
+                for col in 0..16 {
+                    let bit = 0x8000 >> col;
+                    let v = if mask & bit != 0 { if data & bit != 0 { [255, 255, 255] } else { [90, 60, 60] } } else { continue };
+                    for zy in 0..z {
+                        for zx in 0..z {
+                            let x = (gx * gw + col) * z + zx;
+                            let y = (gy * gh + row) * z + zy;
+                            px[y * w + x] = v;
+                        }
+                    }
+                }
+            }
+        }
+    }
+    let flat: Vec<u8> = px.iter().flatten().copied().collect();
+    let f = fs::File::create(args.first().map(String::as_str).unwrap_or("glyphs.png")).unwrap();
+    let mut enc = png::Encoder::new(std::io::BufWriter::new(f), w as u32, h as u32);
+    enc.set_color(png::ColorType::Rgb);
+    enc.set_depth(png::BitDepth::Eight);
+    enc.write_header().unwrap().write_image_data(&flat).unwrap();
+}

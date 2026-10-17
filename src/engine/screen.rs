@@ -694,7 +694,7 @@ impl Sky {
                 h.width,
                 h.height,
             ));
-            s.texts_drawing.push(TextOverlay {
+            push_overlay(&mut s.texts_drawing, TextOverlay {
                 x,
                 y,
                 width: w,
@@ -711,7 +711,7 @@ impl Sky {
         let is_text = (FIRST_TEXT_BUFFER..=LAST_TEXT_BUFFER).contains(&item);
         if is_text {
             if let Some(meta) = self.text.meta[(item - FIRST_TEXT_BUFFER) as usize].as_ref() {
-                s.texts_drawing.push(TextOverlay {
+                push_overlay(&mut s.texts_drawing, TextOverlay {
                     x: xcood + h.offset_x as i32 - TOP_LEFT_X as i32,
                     y: ycood + h.offset_y as i32 - TOP_LEFT_Y as i32,
                     width: h.width,
@@ -838,6 +838,15 @@ impl Sky {
         }
         self.items[grid_item as usize] = Some(grid);
         self.items[layer_item as usize] = Some(layer_data);
+    }
+}
+
+/// Adds an overlay once: the game may draw the same sprite twice in a
+/// cycle (the LINC panel's texts sit in two draw lists), which is
+/// invisible in pixels but would double the typed text.
+fn push_overlay(list: &mut Vec<TextOverlay>, o: TextOverlay) {
+    if !list.contains(&o) {
+        list.push(o);
     }
 }
 
