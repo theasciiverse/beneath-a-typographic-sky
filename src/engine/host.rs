@@ -21,7 +21,7 @@ pub enum HostEvent {
     Key,
     /// pointer moved, in game pixels (0..320, 0..200)
     MouseMove(u16, u16),
-    /// button pressed: 2 is left (walk/use), 1 is right (look), as in sky
+    /// button pressed: 2 is left (look), 1 is right (use), as ScummVM maps them
     Button { x: u16, y: u16, button: u8 },
     ButtonUp,
     Quit,

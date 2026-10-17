@@ -216,7 +216,9 @@ pub fn headless(dir: &Path, args: &[String]) {
         for &(c, x, y, b) in &clicks {
             if c == n {
                 sky.mouse_moved(x, y);
-                sky.mouse.button_pressed(b);
+                if b != 0 {
+                    sky.mouse.button_pressed(b);
+                }
                 println!("cycle {n}: click {b} at {x},{y}");
             }
             if c + 3 == n || c + 1 == n {
@@ -273,4 +275,50 @@ pub fn text(dir: &Path, args: &[String]) {
         let n: u32 = a.parse().unwrap_or(0);
         println!("{n}: {}", String::from_utf8_lossy(&sky.get_text(n)));
     }
+}
+
+/// `typosky monkey <cycles> <seed>`: random pointer moves and clicks,
+/// headless, to shake out crashes. Prints the rooms visited.
+pub fn monkey(dir: &Path, args: &[String]) {
+    use crate::engine::defs::SCREEN;
+    use crate::engine::host::Headless;
+    use crate::engine::sky::Sky;
+    let cycles: u32 = args.first().and_then(|s| s.parse().ok()).unwrap_or(5000);
+    let mut seed: u64 = args.get(1).and_then(|s| s.parse().ok()).unwrap_or(1);
+    let mut rnd = move || {
+        seed ^= seed << 13;
+        seed ^= seed >> 7;
+        seed ^= seed << 17;
+        seed
+    };
+    let mut sky = Sky::new(dir, Box::new(Headless::new())).unwrap();
+    sky.start(true);
+    let mut rooms = std::collections::BTreeSet::new();
+    let mut last_room = u32::MAX;
+    for n in 0..cycles {
+        let r = rnd();
+        if sky.vars[SCREEN as usize] == 102 {
+            // the death screen: start over rather than click Quit
+            sky.restart_game();
+        }
+        if r % 3 == 0 {
+            sky.mouse_moved((r >> 8) as u16 % 320, (r >> 20) as u16 % 200);
+        }
+        if r % 17 == 0 {
+            sky.mouse.button_pressed(if (r >> 30) % 4 == 0 { 1 } else { 2 });
+        }
+        sky.tick();
+        sky.delay(80);
+        let room = sky.vars[SCREEN as usize];
+        if room != last_room {
+            log::info!("cycle {n}: room {room}");
+            last_room = room;
+        }
+        rooms.insert(room);
+        if sky.quit {
+            println!("quit at cycle {n}");
+            break;
+        }
+    }
+    println!("rooms visited: {rooms:?}");
 }

@@ -284,29 +284,9 @@ impl Sky {
         }
     }
 
-    /// fnRestoreGame: the restore panel the game opens itself (after a death).
+    /// fnRestoreGame: the game's own Restore button (on the death screen)
+    /// opens the restore list; leaving it returns to the game.
     pub fn do_load_save_panel(&mut self) {
-        loop {
-            let items = vec![MenuItem::new("Restore a game"), MenuItem::new("Restart"), MenuItem::new("Quit")];
-            match self.host.menu("Game over", &items) {
-                Some(0) => {
-                    if self.restore_menu() {
-                        return;
-                    }
-                }
-                Some(1) => {
-                    self.restart_game();
-                    return;
-                }
-                Some(2) => {
-                    self.quit = true;
-                    return;
-                }
-                _ => {}
-            }
-            if self.quit {
-                return;
-            }
-        }
+        self.restore_menu();
     }
 }
