@@ -22,3 +22,6 @@ pub mod screen;
 pub mod sky;
 pub mod sound;
 pub mod text;
+
+#[cfg(test)]
+mod tests;
