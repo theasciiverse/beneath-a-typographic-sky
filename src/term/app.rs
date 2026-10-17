@@ -104,8 +104,21 @@ impl TermHost {
         let l = self.layout;
         let cx = col.saturating_sub(l.x).min(l.cols - 1) as u32;
         let cy = row.saturating_sub(l.y).min(l.rows - 1) as u32;
-        let x = ((cx * 2 + 1) * GAME_W as u32 / (l.cols as u32 * 2)) as u16;
-        let y = ((cy * 2 + 1) * GAME_H as u32 / (l.rows as u32 * 2)) as u16;
+        let mut x = ((cx * 2 + 1) * GAME_W as u32 / (l.cols as u32 * 2)) as u16;
+        let mut y = ((cy * 2 + 1) * GAME_H as u32 / (l.rows as u32 * 2)) as u16;
+        // A cell on the picture's edge stands for the edge itself, as a
+        // mouse pushed against the screen edge would: the inventory opens
+        // only on pixel rows 0 and 1, which no cell middle reaches.
+        if cx == 0 {
+            x = 0;
+        } else if cx == l.cols as u32 - 1 {
+            x = GAME_W as u16 - 1;
+        }
+        if cy == 0 {
+            y = 0;
+        } else if cy == l.rows as u32 - 1 {
+            y = GAME_H as u16 - 1;
+        }
         (x.min(GAME_W as u16 - 1), y.min(GAME_H as u16 - 1))
     }
 

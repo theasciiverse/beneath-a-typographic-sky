@@ -103,10 +103,15 @@ impl Sky {
             }
         }
         // our addition: each labelled button gets its own pointer text
-        for &(id, area) in &UI_BUTTONS {
+        for &(id, label, area) in &UI_BUTTONS {
             if let Some(c) = self.fetch(id) {
-                let text = self.g(c, f::CURSOR_TEXT) as u32;
-                let text: String = self.get_text(text).iter().map(|&b| super::text::font_char(b)).collect();
+                let text = match label {
+                    Some(l) => l.to_string(),
+                    None => {
+                        let n = self.g(c, f::CURSOR_TEXT) as u32;
+                        self.get_text(n).iter().map(|&b| super::text::font_char(b)).collect()
+                    }
+                };
                 self.screen.labels.insert(c, UiLabel { text, area });
             }
         }
@@ -830,14 +835,17 @@ fn le16(d: &[u8], word: usize) -> u16 {
 }
 
 /// Game objects that are buttons drawn as pixels, which the terminal
-/// labels in type, with the screen area the whole button covers (x, y,
-/// width, height) when that is more than the object's own sprite.
-/// The death screen's Restart, Restore game and Quit panels, measured
-/// from its background (room 102).
-const UI_BUTTONS: [(u32, Option<(i32, i32, u16, u16)>); 3] = [
-    (0xA2, Some((8, 168, 98, 24))),
-    (0xA4, Some((107, 168, 98, 24))),
-    (0xAF, Some((206, 168, 105, 24))),
+/// labels in type: the label (None takes the object's own pointer text)
+/// and the screen area the whole button covers (x, y, width, height) when
+/// that is more than the object's own sprite.
+const UI_BUTTONS: [(u32, Option<&str>, Option<(i32, i32, u16, u16)>); 5] = [
+    // the death screen's panels, measured from its background (room 102)
+    (0xA2, None, Some((8, 168, 98, 24))),
+    (0xA4, None, Some((107, 168, 98, 24))),
+    (0xAF, None, Some((206, 168, 105, 24))),
+    // the inventory bar's scroll arrows
+    (0x2F, Some("◀"), None),
+    (0x30, Some("▶"), None),
 ];
 
 /// A pixel button's label, and the area it covers if not its sprite's.
