@@ -80,3 +80,26 @@ fn texts_decode() {
     assert_eq!(sky.get_text(4148), b"Door");
     assert_eq!(sky.get_text(4097), b"What YOU want?");
 }
+
+/// The dialogue chooser: two lines set up as fnAskThis does, then
+/// fnChooser; both appear as text lines in the right places.
+#[test]
+fn chooser_shows_lines() {
+    let Some(mut sky) = new_game() else { return };
+    play(&mut sky, 20, &[]);
+    sky.mcode(69, 0, 0, 0); // fnNewList
+    sky.mcode(70, 4097, 0, 0); // fnAskThis
+    sky.mcode(70, 4148, 0, 0);
+    let foster = sky.cpt_start(super::defs::ID_FOSTER);
+    sky.compact = foster;
+    assert!(!sky.mcode(39, 0, 0, 0), "fnChooser drops out of the script");
+    sky.recreate();
+    sky.sprite_engine();
+    sky.flip(false);
+    let shown: Vec<String> = sky.screen.texts_shown.iter().map(|t| t.lines.join(" ")).collect();
+    assert!(shown.contains(&"What YOU want?".to_string()), "{shown:?}");
+    assert!(shown.contains(&"Door".to_string()), "{shown:?}");
+    // the second line sits one font height below the first, at the top
+    let door = sky.screen.texts_shown.iter().find(|t| t.lines == ["Door"]).unwrap();
+    assert_eq!((door.x, door.y), (0, 12));
+}
