@@ -12,6 +12,9 @@ pub enum Mode {
     Braille,
     /// U+2580 upper half block, 1x2 pixels per cell, two colours per cell.
     HalfBlock,
+    /// U+2596..U+259F quadrant blocks, 2x2 solid dots per cell, two
+    /// colours per cell.
+    Quadrant,
 }
 
 impl Mode {
@@ -19,6 +22,7 @@ impl Mode {
         match self {
             Mode::Braille => (2, 4),
             Mode::HalfBlock => (1, 2),
+            Mode::Quadrant => (2, 2),
         }
     }
 
@@ -26,6 +30,7 @@ impl Mode {
         match s {
             "braille" => Some(Mode::Braille),
             "half" | "halfblock" => Some(Mode::HalfBlock),
+            "quad" | "quadrant" => Some(Mode::Quadrant),
             _ => None,
         }
     }
@@ -143,6 +148,7 @@ pub fn render(img: &Image, mode: Mode, cols: usize, rows: usize) -> Vec<Cell> {
             out.push(match mode {
                 Mode::HalfBlock => Cell { ch: '▀', fg: dots[0], bg: dots[1] },
                 Mode::Braille => braille_cell(&dots),
+                Mode::Quadrant => quadrant_cell(&dots),
             });
         }
     }
@@ -170,6 +176,19 @@ fn braille_cell(dots: &[Rgb; 8]) -> Cell {
     }
     let (fg, bg) = if lit_light { (light, dark) } else { (dark, light) };
     Cell { ch: char::from_u32(0x2800 + bits as u32).unwrap(), fg, bg }
+}
+
+/// Quadrant characters by bit pattern: 1 top left, 2 top right,
+/// 4 bottom left, 8 bottom right.
+const QUADRANTS: [char; 16] =
+    [' ', '▘', '▝', '▀', '▖', '▌', '▞', '▛', '▗', '▚', '▐', '▜', '▄', '▙', '▟', '█'];
+
+fn quadrant_cell(dots: &[Rgb; 8]) -> Cell {
+    let (light, dark, mask) = split2(&dots[..4]);
+    if mask & 0xF == 0xF || mask & 0xF == 0 {
+        return Cell { ch: ' ', fg: light, bg: mean(&dots[..4]) };
+    }
+    Cell { ch: QUADRANTS[(mask & 0xF) as usize], fg: light, bg: dark }
 }
 
 /// Writes cells as ANSI truecolour text.
@@ -204,6 +223,11 @@ pub fn simulate(cells: &[Cell], cols: usize, cw: usize, chh: usize) -> (usize, u
             for x in 0..cw {
                 let on = match c.ch {
                     '▀' => y < chh / 2,
+                    q if QUADRANTS.contains(&q) => {
+                        let bits = QUADRANTS.iter().position(|&c| c == q).unwrap();
+                        let bit = (if x * 2 >= cw { 2 } else { 1 }) * (if y * 2 >= chh { 4 } else { 1 });
+                        bits & bit != 0
+                    }
                     ' ' => false,
                     b if ('\u{2800}'..='\u{28FF}').contains(&b) => {
                         let bits = b as u32 - 0x2800;

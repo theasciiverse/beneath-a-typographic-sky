@@ -68,6 +68,7 @@ fn main() {
         Some("probe") => tools::probe(&data_dir(), &args[1..]),
         Some("text") => tools::text(&data_dir(), &args[1..]),
         Some("monkey") => tools::monkey(&data_dir(), &args[1..]),
+        Some("modes") => tools::modes(&args[1..]),
         None | Some("play") | Some("--skip-intro") | Some("--mute") => play(&args),
         Some("sfx") => audio_tools::sfx(&data_dir(), &args[1..]),
         Some("speech") => audio_tools::speech(&data_dir(), &args[1..]),

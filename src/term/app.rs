@@ -168,7 +168,8 @@ impl TermHost {
             KeyCode::F(2) => {
                 self.forced_mode = Some(match self.layout.mode {
                     Mode::Braille => Mode::HalfBlock,
-                    Mode::HalfBlock => Mode::Braille,
+                    Mode::HalfBlock => Mode::Quadrant,
+                    Mode::Quadrant => Mode::Braille,
                 });
                 self.relayout();
                 log::debug!("render mode {:?}", self.layout.mode);
@@ -524,6 +525,16 @@ impl Host for TermHost {
             (col as u16, row as u16, ch)
         });
         self.cells = raster::render(&Image { w: GAME_W, h: GAME_H, px: &px }, l.mode, l.cols as usize, l.rows as usize);
+        // the open inventory bar in solid quadrant blocks (David,
+        // 2026-10-17: crisper icons; quadrants beat half blocks side by side)
+        if let (Some((y0, y1)), Mode::Braille) = (frame.solid_band, l.mode) {
+            let solid = raster::render(&Image { w: GAME_W, h: GAME_H, px: &px }, Mode::Quadrant, l.cols as usize, l.rows as usize);
+            let rows = l.rows as i32;
+            let r0 = (y0.max(0) * rows / GAME_H as i32).clamp(0, rows) as usize;
+            let r1 = ((y1 * rows + GAME_H as i32 - 1) / GAME_H as i32).clamp(0, rows) as usize;
+            let cols = l.cols as usize;
+            self.cells[r0 * cols..r1 * cols].copy_from_slice(&solid[r0 * cols..r1 * cols]);
+        }
         self.texts = frame
             .texts
             .iter()

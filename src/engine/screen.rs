@@ -61,6 +61,9 @@ pub struct ScreenState {
     pub text_pixels: bool,
     /// pixel buttons the terminal labels in type: compact start word to label
     pub labels: std::collections::HashMap<usize, UiLabel>,
+    /// the inventory bar's rows this cycle, drawn solid by the terminal
+    pub band_drawing: Option<(i32, i32)>,
+    pub band_shown: Option<(i32, i32)>,
 }
 
 impl Default for ScreenState {
@@ -84,6 +87,8 @@ impl Default for ScreenState {
             texts_shown: Vec::new(),
             text_pixels: true,
             labels: Default::default(),
+            band_drawing: None,
+            band_shown: None,
         }
     }
 }
@@ -127,6 +132,7 @@ impl Sky {
             pixels: &self.screen.display,
             palette: &self.screen.sys_pal,
             texts: &self.screen.texts_shown,
+            solid_band: self.screen.band_shown,
             cursor: &self.mouse.cursor,
             mouse_x: self.mouse.x,
             mouse_y: self.mouse.y,
@@ -145,6 +151,7 @@ impl Sky {
     fn render_final_frame(&mut self) {
         self.copy_rect_to_display(0, 0, W, H);
         self.screen.texts_shown = self.screen.texts_drawing.clone();
+        self.screen.band_shown = self.screen.band_drawing;
         self.update_screen();
     }
 
@@ -253,6 +260,7 @@ impl Sky {
             }
         }
         self.screen.texts_shown = std::mem::take(&mut self.screen.texts_drawing);
+        self.screen.band_shown = self.screen.band_drawing.take();
         if do_update {
             self.update_screen();
         }
@@ -489,6 +497,7 @@ impl Sky {
 
     pub fn sprite_engine(&mut self) {
         self.screen.texts_drawing.clear();
+        self.screen.band_drawing = None;
         self.do_sprites(0); // BACK
         self.sort_sprites();
         self.do_sprites(1); // FORE
@@ -674,6 +683,11 @@ impl Sky {
 
         // A pixel button: label it for the terminal.
         if let Some(label) = s.labels.get(&c) {
+            if label.text == "◀" {
+                // the inventory bar is open: from the top to the arrow's foot
+                let foot = ycood + h.offset_y as i32 - TOP_LEFT_Y as i32 + h.height as i32;
+                s.band_drawing = Some((0, foot));
+            }
             let (x, y, w, bh) = label.area.unwrap_or((
                 xcood + h.offset_x as i32 - TOP_LEFT_X as i32,
                 ycood + h.offset_y as i32 - TOP_LEFT_Y as i32,

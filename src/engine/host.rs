@@ -69,6 +69,9 @@ pub struct Frame<'a> {
     pub cursor: &'a Cursor,
     pub mouse_x: u16,
     pub mouse_y: u16,
+    /// pixel rows (from, to) the front end should draw in solid half
+    /// blocks rather than Braille: the open inventory bar
+    pub solid_band: Option<(i32, i32)>,
 }
 
 /// One line of a menu the host shows (the options panel, save slots).

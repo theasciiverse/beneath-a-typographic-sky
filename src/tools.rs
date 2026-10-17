@@ -442,3 +442,37 @@ pub fn monkey(dir: &Path, args: &[String]) {
     }
     println!("rooms visited: {rooms:?}");
 }
+
+/// `typosky modes <frame.png> <cols> <rows> <y0> <y1> <out.png>`: renders
+/// pixel rows y0..y1 of a 320x200 frame in each terminal mode, stacked,
+/// as the terminal would show them, to compare.
+pub fn modes(args: &[String]) {
+    use crate::term::raster::{self, Image, Mode};
+    let arg = |i: usize| args.get(i).map(String::as_str).unwrap_or_else(|| fail("modes <png> <cols> <rows> <y0> <y1> <out>"));
+    let dec = png::Decoder::new(std::io::BufReader::new(fs::File::open(arg(0)).unwrap()));
+    let mut rd = dec.read_info().unwrap();
+    let mut buf = vec![0; rd.output_buffer_size()];
+    let info = rd.next_frame(&mut buf).unwrap();
+    let ch = info.color_type.samples();
+    let px: Vec<[u8; 3]> = buf[..info.buffer_size()].chunks(ch).map(|p| [p[0], p[1], p[2]]).collect();
+    let (cols, rows): (usize, usize) = (arg(1).parse().unwrap(), arg(2).parse().unwrap());
+    let (y0, y1): (usize, usize) = (arg(3).parse().unwrap(), arg(4).parse().unwrap());
+    let (r0, r1) = (y0 * rows / 200, (y1 * rows + 199) / 200);
+    let mut out: Vec<[u8; 3]> = Vec::new();
+    let mut w = 0;
+    for mode in [Mode::Braille, Mode::HalfBlock, Mode::Quadrant] {
+        let cells = raster::render(&Image { w: 320, h: 200, px: &px }, mode, cols, rows);
+        let band = &cells[r0 * cols..r1 * cols];
+        let (sw, _sh, sim) = raster::simulate(band, cols, 8, 16);
+        w = sw;
+        out.extend(sim);
+        out.extend(std::iter::repeat([40, 40, 40]).take(sw * 4));
+    }
+    let h = out.len() / w;
+    let flat: Vec<u8> = out.iter().flatten().copied().collect();
+    let f = fs::File::create(arg(5)).unwrap();
+    let mut enc = png::Encoder::new(std::io::BufWriter::new(f), w as u32, h as u32);
+    enc.set_color(png::ColorType::Rgb);
+    enc.set_depth(png::BitDepth::Eight);
+    enc.write_header().unwrap().write_image_data(&flat).unwrap();
+}
