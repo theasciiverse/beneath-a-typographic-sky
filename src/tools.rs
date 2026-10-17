@@ -190,11 +190,69 @@ pub fn look(dir: &Path, args: &[String]) {
     println!("{}/{name}.ans and .png", out.display());
 }
 
+/// A headless host that saves the screen as a PNG every `every_ms` of its
+/// clock and can press Escape at a given time: for watching the intro,
+/// which runs inside the engine without returning to the tool.
+struct IntroRecorder {
+    inner: crate::engine::host::Headless,
+    out: PathBuf,
+    every_ms: u64,
+    next_shot: u64,
+    skip_at: Option<u64>,
+    last_texts: Vec<String>,
+}
+
+impl crate::engine::host::Host for IntroRecorder {
+    fn millis(&self) -> u64 {
+        self.inner.millis()
+    }
+    fn sleep(&mut self, ms: u32) {
+        self.inner.sleep(ms)
+    }
+    fn poll(&mut self) -> Vec<crate::engine::host::HostEvent> {
+        use crate::engine::host::{Action, HostEvent};
+        if self.skip_at.is_some_and(|t| self.inner.now >= t) {
+            self.skip_at = None;
+            println!("{:7} ms: Escape", self.inner.now);
+            self.inner.events.push_back(HostEvent::Action(Action::Skip));
+        }
+        self.inner.poll()
+    }
+    fn present(&mut self, frame: &crate::engine::host::Frame) {
+        self.inner.present(frame);
+        let now = self.inner.now;
+        let texts: Vec<String> = frame.texts.iter().map(|t| format!("{} at {},{}", t.lines.join(" / "), t.x, t.y)).collect();
+        if texts != self.last_texts {
+            println!("{now:7} ms: texts {texts:?}");
+            self.last_texts = texts;
+        }
+        if now >= self.next_shot {
+            self.next_shot = now - now % self.every_ms + self.every_ms;
+            let pal: Vec<u8> = frame.palette.iter().map(|&v| v >> 2).collect();
+            write_png(&self.out.join(format!("intro-{now:07}.png")), 320, 200, frame.pixels, &pal);
+        }
+    }
+}
+
 /// `typosky headless <cycles> [every] [out]`: runs the game with no screen
 /// from the restart point, saving every n-th frame as a PNG.
+///
+/// With `--intro` it plays the CD intro first (`--floppy` for the floppy
+/// one), saving the screen every `--every-ms=N` milliseconds of game time
+/// (default 1000) as intro-<ms>.png; `--skip-at=N` presses Escape at N ms.
+/// The game then runs from where the intro leaves it.
 pub fn headless(dir: &Path, args: &[String]) {
     use crate::engine::host::Headless;
     use crate::engine::sky::Sky;
+    let flag = |name: &str| args.iter().any(|a| a == name);
+    let flag_val = |name: &str| -> Option<u64> {
+        args.iter().find_map(|a| a.strip_prefix(name)?.strip_prefix('=')?.parse().ok())
+    };
+    let intro = flag("--intro") || flag("--floppy");
+    let floppy = flag("--floppy");
+    let every_ms = flag_val("--every-ms").unwrap_or(1000).max(1);
+    let skip_at = flag_val("--skip-at");
+    let args: Vec<String> = args.iter().filter(|a| !a.starts_with("--")).cloned().collect();
     let arg = |i: usize| args.get(i).map(String::as_str);
     let cycles: u32 = arg(0).and_then(|s| s.parse().ok()).unwrap_or(100);
     let every: u32 = arg(1).and_then(|s| s.parse().ok()).unwrap_or(25);
@@ -210,8 +268,39 @@ pub fn headless(dir: &Path, args: &[String]) {
             Some((n.parse().ok()?, *v.first()?, *v.get(1)?, *v.get(2).unwrap_or(&2) as u8))
         })
         .collect();
-    let mut sky = Sky::new(dir, Box::new(Headless::new())).unwrap_or_else(|e| fail(&e.to_string()));
-    sky.start(true);
+    let mut sky = if intro {
+        let host = IntroRecorder {
+            inner: Headless::new(),
+            out: out.clone(),
+            every_ms,
+            next_shot: 0,
+            skip_at,
+            last_texts: Vec::new(),
+        };
+        Sky::new(dir, Box::new(host)).unwrap_or_else(|e| fail(&e.to_string()))
+    } else {
+        Sky::new(dir, Box::new(Headless::new())).unwrap_or_else(|e| fail(&e.to_string()))
+    };
+    if !intro {
+        sky.start(true);
+    } else if !floppy {
+        let t0 = sky.host.millis();
+        sky.start(false);
+        println!("intro over after {} ms (past_intro {})", sky.host.millis() - t0, sky.sys.past_intro);
+    } else {
+        // Sky::start with the floppy intro, as ScummVM's go() with alt_intro
+        let t0 = sky.host.millis();
+        let played = sky.do_intro_alt(true);
+        println!("floppy intro {} after {} ms", if played { "played" } else { "skipped" }, sky.host.millis() - t0);
+        if !sky.quit {
+            sky.clear_screen();
+            if played {
+                sky.init_screen0();
+            } else {
+                sky.restart_game();
+            }
+        }
+    }
     for n in 0..cycles {
         for &(c, x, y, b) in &clicks {
             if c == n {

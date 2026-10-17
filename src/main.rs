@@ -61,7 +61,7 @@ fn main() {
                 "usage: typosky [play] [--skip-intro] [--mute]
        typosky dump <files|cpts|screens|rooms> [out dir]
        typosky look <room> <braille|half> <cols> <rows> [out dir]
-       typosky headless <cycles> [every] [out dir] [cycle:x,y[,button] ...]
+       typosky headless [--intro|--floppy] [--every-ms=N] [--skip-at=N] <cycles> [every] [out dir] [cycle:x,y[,button] ...]
        typosky text <number> ...
        typosky sfx <fx 256-394 | section:sound> [room] [--wav out.wav]
        typosky speech <text number> [--wav out.wav]
