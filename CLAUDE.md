@@ -81,6 +81,16 @@ included.
 - `src/term/`: the terminal host (app.rs) and the rasteriser (raster.rs).
 - The options panel is a terminal menu (F5 or q), not the game's pixel
   panel. Saves go to `$XDG_DATA_HOME/typographic-sky/`.
+- Start (David, 2026-10-17): the intro plays on the first launch only
+  (`intro-seen` in the save folder); after that a start menu offers
+  Continue, Restore a game, New game, Watch the intro. Quitting autosaves
+  to slot 0 (`SKY-VM.000`, ScummVM's autosave slot), except on the death
+  screen or while the game forbids saving. `--skip-intro` goes straight
+  to a new game.
+- Pixel buttons are labelled in type (`UI_BUTTONS` in screen.rs): the
+  death screen's three panels and the inventory arrows so far. David's
+  rule: the same treatment wherever the game draws UI as pixels, listing
+  each new case before changing it.
 - Controls: left click looks, right click uses (as in BASS and ScummVM);
   pointer to the top edge opens the inventory; Esc skips, `.` skips a
   line, p pauses, F2 render mode, Ctrl+F fast mode, Ctrl+C quits.

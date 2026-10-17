@@ -53,6 +53,7 @@ fn play(args: &[String]) {
         }
     };
     sky.screen.text_pixels = false;
+    sky.front_end = true;
     let skip_intro = args.iter().any(|a| a == "--skip-intro");
     sky.run(skip_intro);
 }

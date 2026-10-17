@@ -289,4 +289,83 @@ impl Sky {
     pub fn do_load_save_panel(&mut self) {
         self.restore_menu();
     }
+
+    // ----- our additions: start menu and autosave ----------------------
+
+    fn intro_seen_path() -> PathBuf {
+        Self::save_dir().join("intro-seen")
+    }
+
+    fn mark_intro_seen() {
+        let _ = fs::create_dir_all(Self::save_dir());
+        let _ = fs::write(Self::intro_seen_path(), "");
+    }
+
+    /// How the terminal game starts: the intro the first time, a start
+    /// menu after that. Tests and tools call `start` directly.
+    pub fn begin(&mut self, skip_intro: bool) {
+        if !self.front_end || skip_intro {
+            self.start(skip_intro);
+            return;
+        }
+        if !Self::intro_seen_path().exists() {
+            self.start(false);
+            Self::mark_intro_seen();
+            return;
+        }
+        loop {
+            let has_auto = Self::slot_path(0).exists();
+            let has_saves = (1..=SAVE_SLOTS).any(|s| Self::slot_path(s).exists());
+            let items = vec![
+                MenuItem::new("Continue").enabled(has_auto),
+                MenuItem::new("Restore a game").enabled(has_saves),
+                MenuItem::new("New game"),
+                MenuItem::new("Watch the intro"),
+                MenuItem::new("Quit"),
+            ];
+            match self.host.menu("Beneath a Typographic Sky", &items) {
+                Some(0) => match self.restore_game(0) {
+                    Ok(()) => {
+                        log::debug!("start menu: continue");
+                        return;
+                    }
+                    Err(e) => self.host.message(&format!("Could not continue: {e}")),
+                },
+                Some(1) => {
+                    if self.restore_menu() {
+                        return;
+                    }
+                }
+                Some(2) => {
+                    self.start(true);
+                    return;
+                }
+                Some(3) => {
+                    self.start(false);
+                    return;
+                }
+                Some(4) => {
+                    self.quit = true;
+                    return;
+                }
+                _ => {}
+            }
+            if self.quit {
+                return;
+            }
+        }
+    }
+
+    /// Saves to ScummVM's autosave slot (0) when the game is left, so the
+    /// start menu can continue from there. Not on the death screen, and
+    /// not where the game itself forbids saving.
+    pub(crate) fn autosave_on_quit(&mut self) {
+        if !self.front_end || !self.can_save() || self.vars[SCREEN as usize] == 102 {
+            return;
+        }
+        match self.save_game(0, "Autosave") {
+            Ok(()) => log::debug!("autosaved"),
+            Err(e) => log::warn!("autosave failed: {e}"),
+        }
+    }
 }

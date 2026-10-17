@@ -149,6 +149,9 @@ pub struct Sky {
     pub(crate) action: Action,
     pub(crate) key_pressed: bool,
     pub quit: bool,
+    /// the terminal game: start menu once the intro has been seen, and an
+    /// autosave on quit (off for tests and tools)
+    pub front_end: bool,
 }
 
 impl Sky {
@@ -192,6 +195,7 @@ impl Sky {
             action: Action::None,
             key_pressed: false,
             quit: false,
+            front_end: false,
         };
         sky.init();
         Ok(sky)
@@ -424,7 +428,7 @@ impl Sky {
 
     /// SkyEngine::go: the intro, then the game loop until quit.
     pub fn run(&mut self, skip_intro: bool) {
-        self.start(skip_intro);
+        self.begin(skip_intro);
         let mut delay_count = self.host.millis() as i64;
         while !self.quit {
             self.tick();
@@ -443,6 +447,7 @@ impl Sky {
                 self.delay(need as i32);
             }
         }
+        self.autosave_on_quit();
         self.audio_stop_music();
     }
 
