@@ -103,3 +103,14 @@ fn chooser_shows_lines() {
     let door = sky.screen.texts_shown.iter().find(|t| t.lines == ["Door"]).unwrap();
     assert_eq!((door.x, door.y), (0, 12));
 }
+
+/// Text numbers past the end of their section once made get_text read
+/// zeros forever, growing by about 250 MB a second. They must end.
+#[test]
+fn out_of_range_texts_end() {
+    let Some(mut sky) = new_game() else { return };
+    for nr in [0x0FFF, 0x1FFF, 0x7FFF, 30000, 65535] {
+        let t = sky.get_text(nr);
+        assert!(t.len() < 1024, "text {nr} ran on for {} bytes", t.len());
+    }
+}
