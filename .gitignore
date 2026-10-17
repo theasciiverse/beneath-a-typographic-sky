@@ -1,4 +1,5 @@
 /target
 /reference/
 /out/
+/.claude/
 *.log

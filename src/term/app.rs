@@ -1,0 +1,469 @@
+//! The terminal host: shows the engine's frames as text cells, turns
+//! terminal mouse and keys into game input, and draws the menus.
+//!
+//! Run with `RUST_LOG=debug typosky 2>typosky.log` to log every input
+//! event, mode switch and a state snapshot each second.
+
+use std::collections::VecDeque;
+use std::io::{self, stdout};
+use std::time::{Duration, Instant};
+
+use ratatui::buffer::Buffer;
+use ratatui::crossterm::event::{
+    self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers,
+    MouseButton, MouseEventKind,
+};
+use ratatui::crossterm::execute;
+use ratatui::layout::Rect;
+use ratatui::style::{Color, Modifier, Style};
+use ratatui::DefaultTerminal;
+
+use super::raster::{self, Cell, Image, Mode, Rgb};
+use crate::engine::host::{Action, Frame, Host, HostEvent, MenuItem, TextOverlay};
+
+const GAME_W: usize = 320;
+const GAME_H: usize = 200;
+
+/// Where the game picture sits in the terminal.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct Layout {
+    mode: Mode,
+    x: u16,
+    y: u16,
+    cols: u16,
+    rows: u16,
+}
+
+pub struct TermHost {
+    terminal: DefaultTerminal,
+    start: Instant,
+    queue: VecDeque<HostEvent>,
+    held: bool,
+    /// None picks the mode by terminal size
+    forced_mode: Option<Mode>,
+    layout: Layout,
+    /// what was last drawn, so identical frames are skipped
+    last_key: u64,
+    last_draw: Instant,
+    /// last frame as cells, kept for drawing menus over it
+    cells: Vec<Cell>,
+    texts: Vec<TextOverlay>,
+    last_snapshot: Instant,
+}
+
+impl TermHost {
+    pub fn new() -> io::Result<TermHost> {
+        let terminal = ratatui::init();
+        execute!(stdout(), EnableMouseCapture)?;
+        let mut h = TermHost {
+            terminal,
+            start: Instant::now(),
+            queue: VecDeque::new(),
+            held: false,
+            forced_mode: None,
+            layout: Layout { mode: Mode::Braille, x: 0, y: 0, cols: 160, rows: 50 },
+            last_key: 0,
+            last_draw: Instant::now(),
+            cells: Vec::new(),
+            texts: Vec::new(),
+            last_snapshot: Instant::now(),
+        };
+        h.relayout();
+        Ok(h)
+    }
+
+    fn relayout(&mut self) {
+        let size = self.terminal.size().unwrap_or_default();
+        let (tw, th) = (size.width, size.height);
+        // native sizes: half blocks 320x100 cells, Braille 160x50
+        let mode = self.forced_mode.unwrap_or(if tw >= 320 && th >= 100 { Mode::HalfBlock } else { Mode::Braille });
+        let (cw, ch) = mode.dots();
+        let (nat_c, nat_r) = ((GAME_W / cw) as u16, (GAME_H / ch) as u16);
+        let (cols, rows) = if tw >= nat_c && th >= nat_r {
+            (nat_c, nat_r)
+        } else {
+            // shrink, keeping the picture's shape
+            let by_w = (tw, (tw as u32 * nat_r as u32 / nat_c as u32) as u16);
+            if by_w.1 <= th {
+                by_w
+            } else {
+                ((th as u32 * nat_c as u32 / nat_r as u32) as u16, th)
+            }
+        };
+        let cols = cols.max(1);
+        let rows = rows.max(1);
+        self.layout = Layout { mode, x: (tw.saturating_sub(cols)) / 2, y: (th.saturating_sub(rows)) / 2, cols, rows };
+        self.last_key = 0;
+        log::debug!("layout {:?} in a {tw}x{th} terminal", self.layout);
+    }
+
+    /// Terminal cell to game pixel (the middle of the cell's area).
+    fn to_game(&self, col: u16, row: u16) -> (u16, u16) {
+        let l = self.layout;
+        let cx = col.saturating_sub(l.x).min(l.cols - 1) as u32;
+        let cy = row.saturating_sub(l.y).min(l.rows - 1) as u32;
+        let x = ((cx * 2 + 1) * GAME_W as u32 / (l.cols as u32 * 2)) as u16;
+        let y = ((cy * 2 + 1) * GAME_H as u32 / (l.rows as u32 * 2)) as u16;
+        (x.min(GAME_W as u16 - 1), y.min(GAME_H as u16 - 1))
+    }
+
+    fn handle(&mut self, ev: Event) {
+        match ev {
+            Event::Key(k) if k.kind != KeyEventKind::Release => {
+                log::debug!("key {:?} {:?}", k.code, k.modifiers);
+                if let Some(e) = self.key(k) {
+                    self.queue.push_back(e);
+                }
+            }
+            Event::Mouse(m) => {
+                let (x, y) = self.to_game(m.column, m.row);
+                match m.kind {
+                    MouseEventKind::Moved | MouseEventKind::Drag(_) => self.queue.push_back(HostEvent::MouseMove(x, y)),
+                    MouseEventKind::Down(b) => {
+                        log::debug!("mouse {b:?} down at cell {},{} = game {x},{y}", m.column, m.row);
+                        self.held = true;
+                        let button = if b == MouseButton::Right { 1 } else { 2 };
+                        self.queue.push_back(HostEvent::Button { x, y, button });
+                    }
+                    MouseEventKind::Up(_) => {
+                        self.held = false;
+                        self.queue.push_back(HostEvent::ButtonUp);
+                    }
+                    _ => {}
+                }
+            }
+            Event::Resize(..) => self.relayout(),
+            _ => {}
+        }
+    }
+
+    fn key(&mut self, k: KeyEvent) -> Option<HostEvent> {
+        let ctrl = k.modifiers.contains(KeyModifiers::CONTROL);
+        Some(match k.code {
+            KeyCode::Char('c') if ctrl => HostEvent::Quit,
+            KeyCode::Char('f') if ctrl => HostEvent::Action(Action::ToggleFastMode),
+            KeyCode::Char('g') if ctrl => HostEvent::Action(Action::ToggleReallyFastMode),
+            KeyCode::F(5) | KeyCode::Char('q') | KeyCode::Char('Q') => HostEvent::Action(Action::OpenControlPanel),
+            KeyCode::Esc => HostEvent::Action(Action::Skip),
+            KeyCode::Char('.') => HostEvent::Action(Action::SkipLine),
+            KeyCode::Char('p') | KeyCode::Char('P') => HostEvent::Action(Action::Pause),
+            KeyCode::F(2) => {
+                self.forced_mode = Some(match self.layout.mode {
+                    Mode::Braille => Mode::HalfBlock,
+                    Mode::HalfBlock => Mode::Braille,
+                });
+                self.relayout();
+                log::debug!("render mode {:?}", self.layout.mode);
+                return None;
+            }
+            _ => HostEvent::Key,
+        })
+    }
+
+    fn pump(&mut self, wait: Duration) {
+        let deadline = Instant::now() + wait;
+        loop {
+            let left = deadline.saturating_duration_since(Instant::now());
+            match event::poll(left) {
+                Ok(true) => {
+                    if let Ok(ev) = event::read() {
+                        self.handle(ev);
+                    }
+                }
+                _ => break,
+            }
+            if Instant::now() >= deadline {
+                break;
+            }
+        }
+    }
+
+    fn draw(&mut self) {
+        let l = self.layout;
+        let cells = &self.cells;
+        let texts = &self.texts;
+        let _ = self.terminal.draw(|f| {
+            let buf = f.buffer_mut();
+            draw_cells(buf, l, cells);
+            draw_texts(buf, l, texts);
+        });
+    }
+
+    /// Draws a box with `lines` over the last frame; `sel` is highlighted.
+    fn draw_menu(&mut self, title: &str, items: &[MenuItem], sel: usize) {
+        let l = self.layout;
+        let cells = &self.cells;
+        let texts = &self.texts;
+        let _ = self.terminal.draw(|f| {
+            let area = f.area();
+            let buf = f.buffer_mut();
+            draw_cells(buf, l, cells);
+            draw_texts(buf, l, texts);
+            let w = items.iter().map(|i| i.label.chars().count()).max().unwrap_or(0).max(title.chars().count()) as u16 + 6;
+            let h = items.len() as u16 + 4;
+            let r = Rect::new(area.width.saturating_sub(w) / 2, area.height.saturating_sub(h) / 2, w.min(area.width), h.min(area.height));
+            let frame = Style::default().fg(Color::Rgb(120, 200, 140)).bg(Color::Rgb(8, 14, 10));
+            for y in r.top()..r.bottom() {
+                for x in r.left()..r.right() {
+                    buf[(x, y)].set_char(' ').set_style(frame);
+                }
+            }
+            let block = ratatui::widgets::Block::bordered().title(format!(" {title} ")).style(frame);
+            ratatui::widgets::Widget::render(block, r, buf);
+            for (i, it) in items.iter().enumerate() {
+                let y = r.y + 2 + i as u16;
+                let mut st = frame;
+                if !it.enabled {
+                    st = st.fg(Color::Rgb(70, 90, 75));
+                }
+                if i == sel {
+                    st = st.add_modifier(Modifier::REVERSED);
+                }
+                buf.set_stringn(r.x + 3, y, &it.label, (w - 6) as usize, st);
+            }
+        });
+    }
+}
+
+impl Drop for TermHost {
+    fn drop(&mut self) {
+        let _ = execute!(stdout(), DisableMouseCapture);
+        ratatui::restore();
+    }
+}
+
+fn rgb(c: Rgb) -> Color {
+    Color::Rgb(c[0], c[1], c[2])
+}
+
+fn draw_cells(buf: &mut Buffer, l: Layout, cells: &[Cell]) {
+    let area = buf.area;
+    for y in area.top()..area.bottom() {
+        for x in area.left()..area.right() {
+            buf[(x, y)].set_char(' ').set_bg(Color::Black).set_fg(Color::Black);
+        }
+    }
+    for (i, c) in cells.iter().enumerate() {
+        let x = l.x + (i % l.cols as usize) as u16;
+        let y = l.y + (i / l.cols as usize) as u16;
+        if x < area.right() && y < area.bottom() {
+            buf[(x, y)].set_char(c.ch).set_fg(rgb(c.fg)).set_bg(rgb(c.bg));
+        }
+    }
+}
+
+/// Sets the game's text sprites as real characters, centred in the area
+/// the pixel text would have covered.
+fn draw_texts(buf: &mut Buffer, l: Layout, texts: &[TextOverlay]) {
+    let area = buf.area;
+    let sx = l.cols as f32 / GAME_W as f32;
+    let sy = l.rows as f32 / GAME_H as f32;
+    for t in texts {
+        let color = t.color_rgb;
+        let lh = (t.line_height as f32 * sy).max(1.0);
+        for (i, line) in t.lines.iter().enumerate() {
+            let n = line.chars().count() as i32;
+            let left = t.x as f32 * sx;
+            let box_w = t.width as f32 * sx;
+            let x0 = if t.centered {
+                (left + (box_w - n as f32) / 2.0).round() as i32
+            } else {
+                left.round() as i32
+            };
+            let y = (t.y as f32 * sy + i as f32 * lh + (lh - 1.0) / 2.0).round() as i32 + l.y as i32;
+            if y < area.top() as i32 || y >= area.bottom() as i32 {
+                continue;
+            }
+            // keep the line inside the picture
+            let x0 = x0.clamp(0, (l.cols as i32 - n).max(0)) + l.x as i32;
+            for (j, ch) in line.chars().enumerate() {
+                let x = x0 + j as i32;
+                if x < area.left() as i32 || x >= area.right() as i32 {
+                    continue;
+                }
+                let cell = &mut buf[(x as u16, y as u16)];
+                let under = match cell.bg {
+                    Color::Rgb(r, g, b) => [r / 5, g / 5, b / 5],
+                    _ => [0, 0, 0],
+                };
+                cell.set_char(ch).set_fg(rgb(color)).set_bg(rgb(under)).set_style(Style::default().add_modifier(Modifier::BOLD));
+            }
+        }
+    }
+}
+
+fn frame_key(frame: &Frame, l: Layout) -> u64 {
+    use std::hash::{Hash, Hasher};
+    let mut h = std::collections::hash_map::DefaultHasher::new();
+    frame.pixels.hash(&mut h);
+    frame.palette.hash(&mut h);
+    frame.texts.hash(&mut h);
+    frame.cursor.visible.hash(&mut h);
+    frame.cursor.kind.hash(&mut h);
+    frame.cursor.pixels.hash(&mut h);
+    (frame.mouse_x, frame.mouse_y).hash(&mut h);
+    (l.cols, l.rows, l.x, l.y, l.mode as u8).hash(&mut h);
+    h.finish()
+}
+
+impl Host for TermHost {
+    fn millis(&self) -> u64 {
+        self.start.elapsed().as_millis() as u64
+    }
+
+    fn sleep(&mut self, ms: u32) {
+        self.pump(Duration::from_millis(ms as u64));
+    }
+
+    fn poll(&mut self) -> Vec<HostEvent> {
+        self.pump(Duration::ZERO);
+        self.queue.drain(..).collect()
+    }
+
+    fn present(&mut self, frame: &Frame) {
+        let key = frame_key(frame, self.layout);
+        if key == self.last_key || self.last_draw.elapsed() < Duration::from_millis(15) {
+            return;
+        }
+        self.last_key = key;
+        self.last_draw = Instant::now();
+
+        // palette indices to colours, with the pointer on top
+        let pal = frame.palette;
+        let mut px: Vec<Rgb> = frame
+            .pixels
+            .iter()
+            .map(|&p| {
+                let i = p as usize * 3;
+                [pal[i], pal[i + 1], pal[i + 2]]
+            })
+            .collect();
+        let c = frame.cursor;
+        if c.visible {
+            for cy in 0..c.height as i32 {
+                for cx in 0..c.width as i32 {
+                    let p = *c.pixels.get((cy * c.width as i32 + cx) as usize).unwrap_or(&0);
+                    if p == 0 {
+                        continue;
+                    }
+                    let x = frame.mouse_x as i32 - c.hot_x as i32 + cx;
+                    let y = frame.mouse_y as i32 - c.hot_y as i32 + cy;
+                    if (0..GAME_W as i32).contains(&x) && (0..GAME_H as i32).contains(&y) {
+                        let i = p as usize * 3;
+                        px[y as usize * GAME_W + x as usize] = [pal[i], pal[i + 1], pal[i + 2]];
+                    }
+                }
+            }
+        }
+        let l = self.layout;
+        self.cells = raster::render(&Image { w: GAME_W, h: GAME_H, px: &px }, l.mode, l.cols as usize, l.rows as usize);
+        self.texts = frame
+            .texts
+            .iter()
+            .cloned()
+            .map(|mut t| {
+                let i = t.color as usize * 3;
+                t.color_rgb = [pal[i], pal[i + 1], pal[i + 2]];
+                t
+            })
+            .collect();
+        self.draw();
+
+        if self.last_snapshot.elapsed() >= Duration::from_secs(1) {
+            self.last_snapshot = Instant::now();
+            log::debug!(
+                "snapshot: mouse {},{} cursor {} texts {:?}",
+                frame.mouse_x,
+                frame.mouse_y,
+                frame.cursor.kind,
+                frame.texts.iter().map(|t| t.lines.join(" ")).collect::<Vec<_>>()
+            );
+        }
+    }
+
+    fn button_held(&self) -> bool {
+        self.held
+    }
+
+    fn menu(&mut self, title: &str, items: &[MenuItem]) -> Option<usize> {
+        log::debug!("menu {title}");
+        let mut sel = items.iter().position(|i| i.enabled).unwrap_or(0);
+        loop {
+            self.draw_menu(title, items, sel);
+            let Ok(ev) = event::read() else { return None };
+            match ev {
+                Event::Key(k) if k.kind != KeyEventKind::Release => match k.code {
+                    KeyCode::Esc | KeyCode::F(5) => return None,
+                    KeyCode::Up => {
+                        if let Some(p) = (0..sel).rev().find(|&i| items[i].enabled) {
+                            sel = p;
+                        }
+                    }
+                    KeyCode::Down => {
+                        if let Some(n) = (sel + 1..items.len()).find(|&i| items[i].enabled) {
+                            sel = n;
+                        }
+                    }
+                    KeyCode::Enter | KeyCode::Char(' ') => {
+                        if items.get(sel).is_some_and(|i| i.enabled) {
+                            log::debug!("menu {title}: chose {}", items[sel].label);
+                            return Some(sel);
+                        }
+                    }
+                    _ => {}
+                },
+                Event::Mouse(m) => {
+                    // rows of the menu box: work out which line was hit
+                    let area = self.terminal.size().unwrap_or_default();
+                    let h = items.len() as u16 + 4;
+                    let top = area.height.saturating_sub(h) / 2 + 2;
+                    if m.row >= top && m.row < top + items.len() as u16 {
+                        let i = (m.row - top) as usize;
+                        if items[i].enabled {
+                            sel = i;
+                            if matches!(m.kind, MouseEventKind::Down(MouseButton::Left)) {
+                                return Some(i);
+                            }
+                        }
+                    }
+                    if matches!(m.kind, MouseEventKind::Down(MouseButton::Right)) {
+                        return None;
+                    }
+                }
+                Event::Resize(..) => self.relayout(),
+                _ => {}
+            }
+        }
+    }
+
+    fn confirm(&mut self, question: &str) -> bool {
+        self.menu(question, &[MenuItem::new("Yes"), MenuItem::new("No")]) == Some(0)
+    }
+
+    fn message(&mut self, text: &str) {
+        self.menu(text, &[MenuItem::new("OK")]);
+    }
+
+    fn text_input(&mut self, prompt: &str, default: &str) -> Option<String> {
+        let mut s = default.to_string();
+        loop {
+            let shown = format!("{s}_");
+            self.draw_menu(prompt, &[MenuItem::new(&format!("{shown:<30}"))], 0);
+            let Ok(ev) = event::read() else { return None };
+            if let Event::Key(k) = ev {
+                if k.kind == KeyEventKind::Release {
+                    continue;
+                }
+                match k.code {
+                    KeyCode::Esc => return None,
+                    KeyCode::Enter => return Some(s),
+                    KeyCode::Backspace => {
+                        s.pop();
+                    }
+                    KeyCode::Char(c) if s.chars().count() < 30 => s.push(c),
+                    _ => {}
+                }
+            }
+        }
+    }
+}
