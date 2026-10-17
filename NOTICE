@@ -1,0 +1,19 @@
+Beneath a Typographic Sky
+=========================
+
+A modified version of Beneath a Steel Sky, drawn in the terminal.
+
+Beneath a Steel Sky (C) Revolution Software Ltd 1993-. All game content
+(art, story, characters, speech, music) is Revolution's. Revolution
+released the game as freeware in 2003; its licence (readme.txt, shipped
+beside the game data) allows free distribution and modified versions
+marked as such. This is one: the game's pictures are redrawn as text
+characters and its text is set in the terminal's own type. The game data
+itself is unmodified. This version is free and is never sold.
+
+The engine is a Rust port of the ScummVM sky engine (engines/sky,
+(C) The ScummVM Team, GPL-3.0-or-later), and is itself
+GPL-3.0-or-later. The AdLib music is emulated with nuked-opl3, a port of
+Nuked-OPL3 by Nuke.YKT (LGPL-2.1-or-later).
+
+Not affiliated with or endorsed by Revolution Software or ScummVM.

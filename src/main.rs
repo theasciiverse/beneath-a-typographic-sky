@@ -23,6 +23,20 @@ fn play(args: &[String]) {
     let host = match term::app::TermHost::new() {
         Ok(mut h) => {
             h.audio = !args.iter().any(|a| a == "--mute");
+            h.splash(
+                &[
+                    "BENEATH A TYPOGRAPHIC SKY",
+                    "",
+                    "a modified version of Beneath a Steel Sky",
+                    "(C) Revolution Software Ltd, freeware since 2003",
+                    "",
+                    "engine ported from ScummVM  .  an Asciiverse restoration",
+                    "",
+                    "left click looks  .  right click uses  .  pointer to the top for the inventory",
+                    "F5 options  .  Esc skips  .  F2 switches Braille and blocks",
+                ],
+                4000,
+            );
             h
         }
         Err(e) => {

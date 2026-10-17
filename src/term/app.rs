@@ -191,6 +191,36 @@ impl TermHost {
         });
     }
 
+    /// A centred card of text, shown until a key or click, or `ms`.
+    pub fn splash(&mut self, lines: &[&str], ms: u64) {
+        let _ = self.terminal.draw(|f| {
+            let area = f.area();
+            let buf = f.buffer_mut();
+            let style = Style::default().fg(Color::Rgb(150, 210, 160)).bg(Color::Black);
+            for y in area.top()..area.bottom() {
+                for x in area.left()..area.right() {
+                    buf[(x, y)].set_char(' ').set_style(style);
+                }
+            }
+            let top = area.height.saturating_sub(lines.len() as u16) / 2;
+            for (i, l) in lines.iter().enumerate() {
+                let w = l.chars().count() as u16;
+                let st = if i == 0 { style.add_modifier(Modifier::BOLD) } else { style };
+                buf.set_stringn(area.width.saturating_sub(w) / 2, top + i as u16, l, area.width as usize, st);
+            }
+        });
+        let end = Instant::now() + Duration::from_millis(ms);
+        while Instant::now() < end {
+            if let Ok(true) = event::poll(end.saturating_duration_since(Instant::now())) {
+                match event::read() {
+                    Ok(Event::Key(k)) if k.kind == KeyEventKind::Press => break,
+                    Ok(Event::Mouse(m)) if matches!(m.kind, MouseEventKind::Down(_)) => break,
+                    _ => {}
+                }
+            }
+        }
+    }
+
     /// Draws a box with `lines` over the last frame; `sel` is highlighted.
     fn draw_menu(&mut self, title: &str, items: &[MenuItem], sel: usize) {
         let l = self.layout;
