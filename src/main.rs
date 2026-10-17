@@ -21,7 +21,10 @@ fn play(args: &[String]) {
         std::process::exit(1);
     }
     let host = match term::app::TermHost::new() {
-        Ok(h) => h,
+        Ok(mut h) => {
+            h.audio = !args.iter().any(|a| a == "--mute");
+            h
+        }
         Err(e) => {
             eprintln!("typosky: {e}");
             std::process::exit(1);
@@ -49,13 +52,13 @@ fn main() {
         Some("headless") => tools::headless(&data_dir(), &args[1..]),
         Some("probe") => tools::probe(&data_dir(), &args[1..]),
         Some("text") => tools::text(&data_dir(), &args[1..]),
-        None | Some("play") | Some("--skip-intro") => play(&args),
+        None | Some("play") | Some("--skip-intro") | Some("--mute") => play(&args),
         Some("sfx") => audio_tools::sfx(&data_dir(), &args[1..]),
         Some("speech") => audio_tools::speech(&data_dir(), &args[1..]),
         Some("music") => music_tool::music(&data_dir(), &args[1..]),
         _ => {
             eprintln!(
-                "usage: typosky [play] [--skip-intro]
+                "usage: typosky [play] [--skip-intro] [--mute]
        typosky dump <files|cpts|screens|rooms> [out dir]
        typosky look <room> <braille|half> <cols> <rows> [out dir]
        typosky headless <cycles> [every] [out dir] [cycle:x,y[,button] ...]

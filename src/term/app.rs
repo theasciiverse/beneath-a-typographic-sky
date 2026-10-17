@@ -49,6 +49,7 @@ pub struct TermHost {
     cells: Vec<Cell>,
     texts: Vec<TextOverlay>,
     last_snapshot: Instant,
+    pub audio: bool,
 }
 
 impl TermHost {
@@ -67,6 +68,7 @@ impl TermHost {
             cells: Vec::new(),
             texts: Vec::new(),
             last_snapshot: Instant::now(),
+            audio: true,
         };
         h.relayout();
         Ok(h)
@@ -383,6 +385,10 @@ impl Host for TermHost {
 
     fn button_held(&self) -> bool {
         self.held
+    }
+
+    fn wants_audio(&self) -> bool {
+        self.audio
     }
 
     fn menu(&mut self, title: &str, items: &[MenuItem]) -> Option<usize> {

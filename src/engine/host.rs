@@ -96,6 +96,10 @@ pub trait Host {
     fn button_held(&self) -> bool {
         false
     }
+    /// Should the engine open the sound device?
+    fn wants_audio(&self) -> bool {
+        false
+    }
     /// A modal menu; the chosen index, or None when dismissed.
     fn menu(&mut self, _title: &str, _items: &[MenuItem]) -> Option<usize> {
         None
