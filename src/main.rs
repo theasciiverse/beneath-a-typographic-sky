@@ -1,3 +1,5 @@
+mod audio;
+mod audio_tools;
 mod engine;
 mod term;
 mod tools;
@@ -47,8 +49,10 @@ fn main() {
         Some("probe") => tools::probe(&data_dir(), &args[1..]),
         Some("text") => tools::text(&data_dir(), &args[1..]),
         None | Some("play") | Some("--skip-intro") => play(&args),
+        Some("sfx") => audio_tools::sfx(&data_dir(), &args[1..]),
+        Some("speech") => audio_tools::speech(&data_dir(), &args[1..]),
         _ => {
-            eprintln!("usage: typosky dump <files|cpts|screens|rooms> [out dir]\n       typosky look <room> <braille|half> <cols> <rows> [out dir]");
+            eprintln!("usage: typosky dump <files|cpts|screens|rooms> [out dir]\n       typosky look <room> <braille|half> <cols> <rows> [out dir]\n       typosky sfx <fx 256-394 | section:sound> [room] [--wav out.wav]\n       typosky speech <text number> [--wav out.wav]");
             std::process::exit(2);
         }
     }

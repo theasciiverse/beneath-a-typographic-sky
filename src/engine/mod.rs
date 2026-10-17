@@ -20,3 +20,4 @@ pub mod rnc;
 pub mod screen;
 pub mod sky;
 pub mod text;
+pub mod sound;
