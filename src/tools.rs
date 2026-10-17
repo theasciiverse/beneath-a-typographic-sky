@@ -293,13 +293,28 @@ pub fn monkey(dir: &Path, args: &[String]) {
     };
     let mut sky = Sky::new(dir, Box::new(Headless::new())).unwrap();
     sky.start(true);
+    // the scripted opening first, so the monkey starts in room 1
+    let opening = [(5u32, 23u16, 70u16, 1u8), (150, 160, 1, 0), (160, 40, 10, 1), (175, 280, 60, 0), (180, 280, 60, 1)];
+    for n in 0..600 {
+        for &(c, x, y, b) in &opening {
+            if c == n || c + 1 == n || c + 3 == n {
+                sky.mouse_moved(x, y);
+            }
+            if c == n && b != 0 {
+                sky.mouse.button_pressed(b);
+            }
+        }
+        sky.tick();
+        sky.delay(80);
+    }
+    let start_save = sky.prepare_save_data();
     let mut rooms = std::collections::BTreeSet::new();
     let mut last_room = u32::MAX;
     for n in 0..cycles {
         let r = rnd();
         if sky.vars[SCREEN as usize] == 102 {
-            // the death screen: start over rather than click Quit
-            sky.restart_game();
+            // the death screen: back to room 1 rather than click Quit
+            sky.parse_save_data(&start_save).unwrap();
         }
         if r % 3 == 0 {
             sky.mouse_moved((r >> 8) as u16 % 320, (r >> 20) as u16 % 200);
