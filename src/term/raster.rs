@@ -136,34 +136,65 @@ const BRAILLE_BIT: [[u8; 4]; 2] = [[0x01, 0x02, 0x04, 0x40], [0x08, 0x10, 0x20, 
 pub fn render(img: &Image, mode: Mode, cols: usize, rows: usize) -> Vec<Cell> {
     let (cw, ch) = mode.dots();
     let (gw, gh) = (cols * cw, rows * ch);
-    let mut out = Vec::with_capacity(cols * rows);
-    let mut dots = [[0u8; 3]; 8];
+    let mut samples: Vec<[Rgb; 8]> = Vec::with_capacity(cols * rows);
     for cy in 0..rows {
         for cx in 0..cols {
+            let mut dots = [[0u8; 3]; 8];
             for y in 0..ch {
                 for x in 0..cw {
                     dots[y * cw + x] = sample(img, gw, gh, cx * cw + x, cy * ch + y);
                 }
             }
-            out.push(match mode {
-                Mode::HalfBlock => Cell { ch: '▀', fg: dots[0], bg: dots[1] },
-                Mode::Braille => braille_cell(&dots),
-                Mode::Quadrant => quadrant_cell(&dots),
-            });
+            samples.push(dots);
         }
     }
-    out
+    // Braille: the brightness around each cell, to decide which of its two
+    // colours is the background (see braille_cell)
+    let around: Vec<i32> = if mode == Mode::Braille {
+        let n = cw * ch;
+        let cell_luma: Vec<i32> = samples.iter().map(|d| d[..n].iter().map(|&c| luma(c)).sum::<i32>() / n as i32).collect();
+        (0..rows * cols)
+            .map(|i| {
+                let (cx, cy) = ((i % cols) as i32, (i / cols) as i32);
+                let (mut sum, mut cnt) = (0, 0);
+                for dy in -1..=1 {
+                    for dx in -1..=1 {
+                        let (x, y) = (cx + dx, cy + dy);
+                        if x >= 0 && y >= 0 && (x as usize) < cols && (y as usize) < rows {
+                            sum += cell_luma[y as usize * cols + x as usize];
+                            cnt += 1;
+                        }
+                    }
+                }
+                sum / cnt
+            })
+            .collect()
+    } else {
+        Vec::new()
+    };
+    samples
+        .iter()
+        .enumerate()
+        .map(|(i, dots)| match mode {
+            Mode::HalfBlock => Cell { ch: '▀', fg: dots[0], bg: dots[1] },
+            Mode::Braille => braille_cell(dots, around[i]),
+            Mode::Quadrant => quadrant_cell(dots),
+        })
+        .collect()
 }
 
-fn braille_cell(dots: &[Rgb; 8]) -> Cell {
+/// `around` is the mean brightness of the cell and its eight neighbours.
+fn braille_cell(dots: &[Rgb; 8], around: i32) -> Cell {
     let (light, dark, mask) = split2(dots);
     if mask == 0xFF || mask == 0 || dist(light, dark) < 60 {
         // flat: a space shows the background only
         return Cell { ch: ' ', fg: light, bg: mean(dots) };
     }
-    // The dots are drawn in fg. Draw the minority so a cell reads as
-    // its majority colour with a pattern on top.
-    let lit_light = mask.count_ones() <= 4;
+    // The dots are drawn in fg, the rest of the cell in bg. The colour
+    // nearer the surroundings' brightness is the background, so a bright
+    // stroke on a dark screen stays dots even where it covers most of a
+    // cell; deciding by count alone lit such cells up as solid blobs.
+    let lit_light = (luma(light) - around).abs() > (luma(dark) - around).abs();
     let mut bits = 0u8;
     for y in 0..4 {
         for x in 0..2 {
