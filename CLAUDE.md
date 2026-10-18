@@ -11,7 +11,8 @@ over the picture, mouse through the terminal. Sound effects, speech and
 AdLib music (Nuked OPL3) are connected. Checked headless: the opening
 plays through (take the rung, pry the door, the guard's lines, room 1).
 The intro is being ported; until then the game starts at the restart
-point. Own git repo, not on GitHub yet.
+point. Own git repo, private at github.com/theasciiverse/beneath-a-typographic-sky
+(branch main, pushed 2026-10-18).
 
 ## Name
 
