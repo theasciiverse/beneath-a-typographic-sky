@@ -183,6 +183,15 @@ pub fn render(img: &Image, mode: Mode, cols: usize, rows: usize) -> Vec<Cell> {
         .collect()
 }
 
+/// Which rule picks a Braille cell's background: 0 by count (the
+/// default: cleanest rooms), 1 by the surroundings, 2 by the surroundings
+/// only when they clearly decide. 1 and 2 remove blobs from bright pixel
+/// text on dark screens but add noise to the rooms (David, 2026-10-18:
+/// "a lot more noise"); in play that text is typed anyway. Tools take
+/// TYPOSKY_RULE to compare.
+pub static RULE: std::sync::atomic::AtomicU8 = std::sync::atomic::AtomicU8::new(0);
+const MARGIN: i32 = 60;
+
 /// `around` is the mean brightness of the cell and its eight neighbours.
 fn braille_cell(dots: &[Rgb; 8], around: i32) -> Cell {
     let (light, dark, mask) = split2(dots);
@@ -194,7 +203,20 @@ fn braille_cell(dots: &[Rgb; 8], around: i32) -> Cell {
     // nearer the surroundings' brightness is the background, so a bright
     // stroke on a dark screen stays dots even where it covers most of a
     // cell; deciding by count alone lit such cells up as solid blobs.
-    let lit_light = (luma(light) - around).abs() > (luma(dark) - around).abs();
+    let by_count = mask.count_ones() <= 4;
+    let (to_light, to_dark) = ((luma(light) - around).abs(), (luma(dark) - around).abs());
+    let lit_light = match RULE.load(std::sync::atomic::Ordering::Relaxed) {
+        0 => by_count,
+        1 => to_light > to_dark,
+        // only where the surroundings clearly side with one colour
+        _ => {
+            if (to_light - to_dark).abs() > MARGIN {
+                to_light > to_dark
+            } else {
+                by_count
+            }
+        }
+    };
     let mut bits = 0u8;
     for y in 0..4 {
         for x in 0..2 {

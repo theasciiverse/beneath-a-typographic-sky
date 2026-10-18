@@ -162,6 +162,9 @@ pub fn look(dir: &Path, args: &[String]) {
     let mode = arg(1).and_then(Mode::parse).unwrap_or(Mode::Braille);
     let cols: usize = arg(2).and_then(|s| s.parse().ok()).unwrap_or(160);
     let rows: usize = arg(3).and_then(|s| s.parse().ok()).unwrap_or(48);
+    if let Some(r) = std::env::var("TYPOSKY_RULE").ok().and_then(|v| v.parse().ok()) {
+        raster::RULE.store(r, std::sync::atomic::Ordering::Relaxed);
+    }
     let out = PathBuf::from(arg(4).unwrap_or("out/look"));
     let (_, file, pal) = rooms(&disk, &cpt)
         .into_iter()
@@ -461,6 +464,9 @@ pub fn modes(args: &[String]) {
     let ch = info.color_type.samples();
     let px: Vec<[u8; 3]> = buf[..info.buffer_size()].chunks(ch).map(|p| [p[0], p[1], p[2]]).collect();
     let (cols, rows): (usize, usize) = (arg(1).parse().unwrap(), arg(2).parse().unwrap());
+    if let Some(r) = std::env::var("TYPOSKY_RULE").ok().and_then(|v| v.parse().ok()) {
+        raster::RULE.store(r, std::sync::atomic::Ordering::Relaxed);
+    }
     let (y0, y1): (usize, usize) = (arg(3).parse().unwrap(), arg(4).parse().unwrap());
     let (r0, r1) = (y0 * rows / 200, (y1 * rows + 199) / 200);
     let mut out: Vec<[u8; 3]> = Vec::new();
