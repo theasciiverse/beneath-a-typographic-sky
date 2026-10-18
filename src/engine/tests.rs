@@ -123,3 +123,19 @@ fn font_characters() {
     let s: String = [0x80u8, 0x80, b'O', b'K', 0x81, 0x81].iter().map(|&b| font_char(b)).collect();
     assert_eq!(s, "<<OK>>");
 }
+
+/// On a coarse terminal a cell covers several pixels; a pointer cell that
+/// covers part of a thin hotspot snaps onto it.
+#[test]
+fn pointer_snaps_to_thin_hotspots() {
+    let Some(dir) = data() else { return };
+    let mut host = Headless::new();
+    host.reach = (2, 4);
+    let mut sky = Sky::new(&dir, Box::new(host)).expect("engine starts");
+    sky.start(true);
+    play(&mut sky, 20, &[]);
+    // the rung's hotspot is screen x 15..32, y 69..72, three pixels tall
+    assert_eq!(sky.snap_pointer(20, 75), (20, 72), "3 pixels below the rung snaps onto it");
+    assert_eq!(sky.snap_pointer(20, 70), (20, 70), "on the rung stays put");
+    assert_eq!(sky.snap_pointer(20, 79), (20, 79), "out of reach stays put");
+}

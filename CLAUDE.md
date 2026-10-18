@@ -96,6 +96,14 @@ included.
   game's pixel font reads worse at normal sizes). `--game-font` keeps the
   game's own fonts as Braille dots, for very high resolution screens;
   button labels stay typed either way.
+- Language (David, 2026-10-18): the one chosen in F5 before (saved as
+  `language` in the save folder), else the system locale, else English;
+  all eight CD languages display correctly through the font table;
+  speech is English only.
+- Pointer snapping (David, 2026-10-18): on coarse terminals, a cell that
+  covers part of a hotspot while its middle misses snaps onto it
+  (`Sky::snap_pointer`, `Host::pointer_reach`), so thin hotspots stay
+  clickable at any size.
 - Inventory and LINC menu icons stay pictures (drawn in quadrant blocks
   while the bar is open), with their names in type on hover; David,
   2026-10-18: "good as they are with the overlay text".

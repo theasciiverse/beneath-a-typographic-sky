@@ -102,6 +102,11 @@ pub trait Host {
     fn button_held(&self) -> bool {
         false
     }
+    /// How far one pointer position reaches, in game pixels either side
+    /// (half a terminal cell); the engine snaps to hotspots within it.
+    fn pointer_reach(&self) -> (u16, u16) {
+        (0, 0)
+    }
     /// Should the engine open the sound device?
     fn wants_audio(&self) -> bool {
         false
@@ -129,6 +134,8 @@ pub struct Headless {
     pub last: Vec<u8>,
     pub last_palette: Vec<u8>,
     pub last_texts: Vec<TextOverlay>,
+    /// pointer_reach to report (half a cell), for tests
+    pub reach: (u16, u16),
 }
 
 impl Headless {
@@ -140,6 +147,7 @@ impl Headless {
             last: Vec::new(),
             last_palette: Vec::new(),
             last_texts: Vec::new(),
+            reach: (0, 0),
         }
     }
 }
@@ -154,6 +162,9 @@ impl Host for Headless {
     fn poll(&mut self) -> Vec<HostEvent> {
         // one event per poll, so scripted input spreads over game cycles
         self.events.pop_front().into_iter().collect()
+    }
+    fn pointer_reach(&self) -> (u16, u16) {
+        self.reach
     }
     fn present(&mut self, frame: &Frame) {
         self.frames += 1;

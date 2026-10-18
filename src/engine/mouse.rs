@@ -250,4 +250,57 @@ impl Sky {
             self.host.sleep(20);
         }
     }
+
+    /// Our addition for coarse terminals: when the pointer's cell covers
+    /// part of a hotspot but its middle misses every hotspot, move the
+    /// pointer to the nearest point of the hotspot, so anything visible
+    /// can be clicked at any terminal size (David, 2026-10-18). Hotspots
+    /// are found as Mouse::pointerEngine finds them.
+    pub(crate) fn snap_pointer(&self, x: u16, y: u16) -> (u16, u16) {
+        let (rx, ry) = self.host.pointer_reach();
+        if rx == 0 && ry == 0 {
+            return (x, y);
+        }
+        let (wx, wy) = (x as i32 + TOP_LEFT_X as i32, y as i32 + TOP_LEFT_Y as i32);
+        let mut best: Option<(i32, i32, i32)> = None; // distance, x, y
+        let mut list_num = self.vars[MOUSE_LIST_NO as usize];
+        'lists: loop {
+            let Some(mut p) = self.fetch(list_num) else { break };
+            while self.w(p) != 0 && self.w(p) != 0xFFFF {
+                let Some(c) = self.fetch(self.w(p) as u32) else { break 'lists };
+                p += 1;
+                if self.g(c, f::SCREEN) as u32 != self.vars[SCREEN as usize] || self.g(c, f::STATUS) & 16 == 0 {
+                    continue;
+                }
+                let left = self.g(c, f::XCOOD) as i32 + self.g(c, f::MOUSE_REL_X) as i16 as i32;
+                let top = self.g(c, f::YCOOD) as i32 + self.g(c, f::MOUSE_REL_Y) as i16 as i32;
+                let right = left + self.g(c, f::MOUSE_SIZE_X) as i32;
+                let bottom = top + self.g(c, f::MOUSE_SIZE_Y) as i32;
+                if wx >= left && wx <= right && wy >= top && wy <= bottom {
+                    return (x, y); // the middle already hits something
+                }
+                // the nearest point of the hotspot, if it lies in the cell
+                let (nx, ny) = (wx.clamp(left, right), wy.clamp(top, bottom));
+                if (nx - wx).abs() <= rx as i32 && (ny - wy).abs() <= ry as i32 {
+                    let d = (nx - wx).abs() + (ny - wy).abs();
+                    if best.is_none_or(|b| d < b.0) {
+                        best = Some((d, nx, ny));
+                    }
+                }
+            }
+            if self.w(p) == 0xFFFF {
+                list_num = self.w(p + 1) as u32;
+                continue;
+            }
+            break;
+        }
+        match best {
+            Some((_, nx, ny)) => {
+                let sx = (nx - TOP_LEFT_X as i32).clamp(0, GAME_SCREEN_WIDTH as i32 - 1);
+                let sy = (ny - TOP_LEFT_Y as i32).clamp(0, FULL_SCREEN_HEIGHT as i32 - 1);
+                (sx as u16, sy as u16)
+            }
+            None => (x, y),
+        }
+    }
 }

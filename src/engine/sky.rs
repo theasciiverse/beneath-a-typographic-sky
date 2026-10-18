@@ -384,11 +384,13 @@ impl Sky {
                 HostEvent::Key => self.key_pressed = true,
                 HostEvent::MouseMove(x, y) => {
                     if self.sys.system_flags & SF_MOUSE_LOCKED == 0 {
+                        let (x, y) = self.snap_pointer(x, y);
                         self.mouse_moved(x, y);
                     }
                 }
                 HostEvent::Button { x, y, button } => {
                     if self.sys.system_flags & SF_MOUSE_LOCKED == 0 {
+                        let (x, y) = self.snap_pointer(x, y);
                         self.mouse_moved(x, y);
                     }
                     self.mouse.button_pressed(button);

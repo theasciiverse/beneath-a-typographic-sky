@@ -613,6 +613,12 @@ impl Host for TermHost {
         self.held
     }
 
+    fn pointer_reach(&self) -> (u16, u16) {
+        let l = self.layout;
+        // half a cell, in game pixels
+        ((GAME_W as u16 / l.cols.max(1)) / 2, (GAME_H as u16 / l.rows.max(1)) / 2)
+    }
+
     fn wants_audio(&self) -> bool {
         self.audio
     }
