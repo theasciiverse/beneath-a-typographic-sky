@@ -377,8 +377,13 @@ pub fn text(dir: &Path, args: &[String]) {
     use crate::engine::sky::Sky;
     let mut sky = Sky::new(dir, Box::new(Headless::new())).unwrap();
     for a in args {
+        if let Some(l) = a.strip_prefix("--lang=") {
+            sky.set_language(l.parse().unwrap_or(0));
+            continue;
+        }
         let n: u32 = a.parse().unwrap_or(0);
-        println!("{n}: {}", String::from_utf8_lossy(&sky.get_text(n)));
+        let t: String = sky.get_text(n).iter().map(|&b| crate::engine::text::font_char(b)).collect();
+        println!("{n}: {t}");
     }
 }
 

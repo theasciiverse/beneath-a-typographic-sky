@@ -86,6 +86,19 @@ impl Sky {
         self.fn_set_font(0);
     }
 
+    /// Switches the language of game text (SKY_ENGLISH .. SKY_SPANISH),
+    /// if the data has it; loaded text sections are dropped.
+    pub fn set_language(&mut self, lang: u16) -> bool {
+        if lang > 7 || !self.disk.exists(60600 + lang * 8) {
+            return false;
+        }
+        self.sys.language = lang;
+        for slot in FIRST_TEXT_SEC..FIRST_TEXT_SEC + 8 {
+            self.items[slot] = None;
+        }
+        true
+    }
+
     pub(crate) fn fn_set_font(&mut self, font: u32) {
         assert!(font <= 2, "tried to set invalid font {font}");
         self.text.cur_char_set = font;
