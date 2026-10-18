@@ -88,7 +88,8 @@ included.
   screen or while the game forbids saving. `--skip-intro` goes straight
   to a new game.
 - Pixel buttons are labelled in type (`UI_BUTTONS` in screen.rs): the
-  death screen's three panels and the inventory arrows so far. David's
+  death screen's three panels, the inventory arrows and the LINC info
+  panel's smiley button ("Close"). David's
   rule: the same treatment wherever the game draws UI as pixels, listing
   each new case before changing it.
 - Inventory and LINC menu icons stay pictures (drawn in quadrant blocks
