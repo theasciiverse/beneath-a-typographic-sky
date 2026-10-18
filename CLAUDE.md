@@ -91,6 +91,9 @@ included.
   death screen's three panels and the inventory arrows so far. David's
   rule: the same treatment wherever the game draws UI as pixels, listing
   each new case before changing it.
+- Inventory and LINC menu icons stay pictures (drawn in quadrant blocks
+  while the bar is open), with their names in type on hover; David,
+  2026-10-18: "good as they are with the overlay text".
 - Controls: left click looks, right click uses (as in BASS and ScummVM);
   pointer to the top edge opens the inventory; Esc skips, `.` skips a
   line, p pauses, F2 render mode, Ctrl+F fast mode, Ctrl+C quits.
