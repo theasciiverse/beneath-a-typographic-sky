@@ -92,6 +92,10 @@ included.
   panel's smiley button ("Close"). David's
   rule: the same treatment wherever the game draws UI as pixels, listing
   each new case before changing it.
+- Game text is set in terminal type by default (David, 2026-10-18: the
+  game's pixel font reads worse at normal sizes). `--game-font` keeps the
+  game's own fonts as Braille dots, for very high resolution screens;
+  button labels stay typed either way.
 - Inventory and LINC menu icons stay pictures (drawn in quadrant blocks
   while the bar is open), with their names in type on hover; David,
   2026-10-18: "good as they are with the overlay text".
