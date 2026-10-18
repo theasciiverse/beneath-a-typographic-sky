@@ -45,6 +45,8 @@ pub struct TermHost {
     /// what was last drawn, so identical frames are skipped
     last_key: u64,
     last_draw: Instant,
+    /// the frame without its palette, to spot fades (colour-only changes)
+    last_shape: u64,
     /// last frame as cells, kept for drawing menus over it
     cells: Vec<Cell>,
     texts: Vec<TextOverlay>,
@@ -71,6 +73,7 @@ impl TermHost {
             layout: Layout { mode: Mode::Braille, x: 0, y: 0, cols: 160, rows: 50 },
             last_key: 0,
             last_draw: Instant::now(),
+            last_shape: 0,
             cells: Vec::new(),
             texts: Vec::new(),
             last_snapshot: Instant::now(),
@@ -517,6 +520,19 @@ fn pointer_glyph(c: &crate::engine::host::Cursor) -> Option<char> {
     }
 }
 
+/// Like frame_key, without the palette.
+fn frame_shape(frame: &Frame, l: Layout) -> u64 {
+    use std::hash::{Hash, Hasher};
+    let mut h = std::collections::hash_map::DefaultHasher::new();
+    frame.pixels.hash(&mut h);
+    frame.texts.hash(&mut h);
+    frame.cursor.visible.hash(&mut h);
+    frame.cursor.kind.hash(&mut h);
+    (frame.mouse_x, frame.mouse_y).hash(&mut h);
+    (l.cols, l.rows, l.x, l.y, l.mode as u8).hash(&mut h);
+    h.finish()
+}
+
 fn frame_key(frame: &Frame, l: Layout) -> u64 {
     use std::hash::{Hash, Hasher};
     let mut h = std::collections::hash_map::DefaultHasher::new();
@@ -550,6 +566,15 @@ impl Host for TermHost {
         if key == self.last_key || self.last_draw.elapsed() < Duration::from_millis(15) {
             return;
         }
+        // A fade changes every cell's colours at each of its 32 steps; draw
+        // such colour-only changes at most 12 times a second (the game keeps
+        // presenting, so the final colours always arrive). A fade went from
+        // about 3.7 MB of terminal output to about 0.6 MB.
+        let shape = frame_shape(frame, self.layout);
+        if shape == self.last_shape && self.last_draw.elapsed() < Duration::from_millis(83) {
+            return;
+        }
+        self.last_shape = shape;
         self.last_key = key;
         self.last_draw = Instant::now();
 

@@ -151,6 +151,12 @@ licence (`readme.txt`, shipped beside it); see `NOTICE`.
 - Data is looked for in `TYPOSKY_DATA`, then `data/` beside the binary
   (the release layout), then beside the binary, then
   `reference/bass-cd-1.2/` (gitignored, for development).
+- Hub entry (2026-10-18): `hub/catalog/beneath-a-typographic-sky.toml`
+  and `.md`; preview `asciiverse/beneath-a-typographic-sky.cast`
+  (100x30, 54 s, the opening puzzle, still frame at 40 s), recorded with
+  `hub/tools/castrec.py` (it gained `right` and `move` mouse steps for
+  this). Replay a cast to PNGs with `tools/cast2png.py` (needs pyte).
+  `system_deps` waits for the first Linux build (ALSA).
 - Packaging: `asciiverse/package.sh <target>` makes
   `dist/beneath-a-typographic-sky-<target>.tar.gz` (.zip on Windows):
   `typosky`, `data/` (sky.dsk, sky.dnr, sky.cpt and Revolution's
