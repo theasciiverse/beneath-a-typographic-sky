@@ -375,15 +375,45 @@ fn draw_texts(buf: &mut Buffer, l: Layout, texts: &[TextOverlay]) {
                 if x < area.left() as i32 || x >= area.right() as i32 {
                     continue;
                 }
+                if ch == ' ' {
+                    continue; // the picture shows between words
+                }
                 let cell = &mut buf[(x as u16, y as u16)];
-                let under = match cell.bg {
-                    Color::Rgb(r, g, b) => [r / 5, g / 5, b / 5],
-                    _ => [0, 0, 0],
-                };
-                cell.set_char(ch).set_fg(rgb(color)).set_bg(rgb(under)).set_style(Style::default().add_modifier(Modifier::BOLD));
+                let (letter, under) = blend_letter(cell, color);
+                cell.set_char(ch).set_fg(rgb(letter)).set_bg(rgb(under)).set_style(Style::default().add_modifier(Modifier::BOLD));
             }
         }
     }
+}
+
+/// Colours for a letter set over the picture: the cell keeps the
+/// picture's own colour behind it (the mix of its two Braille colours,
+/// a little darker), and the letter moves away from that, lighter or
+/// darker, until it stands out (David, 2026-10-18: blend the back of the
+/// text with what is beneath). Returns (letter, background).
+fn blend_letter(cell: &ratatui::buffer::Cell, text: Rgb) -> (Rgb, Rgb) {
+    let c = |col: Color| match col {
+        Color::Rgb(r, g, b) => [r as f32, g as f32, b as f32],
+        _ => [0.0; 3],
+    };
+    let (fg, bg) = (c(cell.fg), c(cell.bg));
+    let luma = |p: [f32; 3]| 0.299 * p[0] + 0.587 * p[1] + 0.114 * p[2];
+    let back = [(fg[0] + bg[0]) * 0.4, (fg[1] + bg[1]) * 0.4, (fg[2] + bg[2]) * 0.4];
+    let b = luma(back);
+    let mut t = [text[0] as f32, text[1] as f32, text[2] as f32];
+    const CONTRAST: f32 = 100.0;
+    // toward white over dark backgrounds, toward black over light ones
+    let target = if b < 140.0 { 255.0 } else { 0.0 };
+    for _ in 0..16 {
+        if (luma(t) - b).abs() >= CONTRAST {
+            break;
+        }
+        for v in t.iter_mut() {
+            *v += (target - *v) * 0.2;
+        }
+    }
+    let u = |p: [f32; 3]| [p[0] as u8, p[1] as u8, p[2] as u8];
+    (u(t), u(back))
 }
 
 /// A pixel button as a framed box with its label in type.
