@@ -107,7 +107,13 @@ impl Sky {
                 s.sys_pal[3 * GAME_COLORS + i * 3 + c] = vga(TOP_16_COLORS[i * 3 + c]);
             }
         }
-        // our addition: each labelled button gets its own pointer text
+        self.build_ui_labels();
+    }
+
+    /// Our addition: each labelled button gets its own pointer text, in
+    /// the current language.
+    pub(crate) fn build_ui_labels(&mut self) {
+        self.screen.labels.clear();
         for &(id, label, area) in &UI_BUTTONS {
             if let Some(c) = self.fetch(id) {
                 let text = match label {

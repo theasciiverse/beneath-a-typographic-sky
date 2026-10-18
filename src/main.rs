@@ -56,6 +56,7 @@ fn play(args: &[String]) {
     };
     sky.screen.text_pixels = args.iter().any(|a| a == "--game-font");
     sky.front_end = true;
+    sky.init_language();
     let skip_intro = args.iter().any(|a| a == "--skip-intro");
     sky.run(skip_intro);
 }

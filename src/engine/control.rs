@@ -229,6 +229,7 @@ impl Sky {
                 MenuItem::new("Save the game").enabled(self.can_save()),
                 MenuItem::new(if text_on { "Subtitles: on" } else { "Subtitles: off" }),
                 MenuItem::new(if speech_on { "Speech: on" } else { "Speech: off" }).enabled(self.disk.is_cd()),
+                MenuItem::new(&format!("Language: {}", LANGUAGES[self.sys.language as usize].1)),
                 MenuItem::new("Restart"),
                 MenuItem::new("Quit"),
                 MenuItem::new("Resume"),
@@ -254,13 +255,14 @@ impl Sky {
                         self.sys.system_flags ^= SF_ALLOW_SPEECH;
                     }
                 }
-                Some(4) => {
+                Some(4) => self.language_menu(),
+                Some(5) => {
                     if self.host.confirm("Restart the game?") {
                         self.restart_game();
                         return;
                     }
                 }
-                Some(5) => {
+                Some(6) => {
                     if self.host.confirm("Quit the game?") {
                         self.quit = true;
                         return;
@@ -403,5 +405,78 @@ impl Sky {
             Ok(()) => log::debug!("autosaved"),
             Err(e) => log::warn!("autosave failed: {e}"),
         }
+    }
+
+    // ----- our addition: the language ---------------------------------
+
+    fn language_path() -> PathBuf {
+        Self::save_dir().join("language")
+    }
+
+    /// The terminal game's language at start: the one chosen in the menu
+    /// before, else the system's (LC_ALL, LC_MESSAGES, LANG), else
+    /// English (David, 2026-10-18).
+    pub fn init_language(&mut self) {
+        let saved = fs::read_to_string(Self::language_path()).ok();
+        let code = saved.as_deref().map(str::trim).map(str::to_string).or_else(|| {
+            ["LC_ALL", "LC_MESSAGES", "LANG"]
+                .iter()
+                .filter_map(|v| std::env::var(v).ok())
+                .find(|v| !v.is_empty() && v != "C" && v != "POSIX")
+        });
+        let lang = code.as_deref().map(language_from_locale).unwrap_or(SKY_ENGLISH as u16);
+        if !self.set_language(lang) {
+            self.set_language(SKY_ENGLISH as u16);
+        }
+        log::debug!("language {} from {:?}", LANGUAGES[self.sys.language as usize].1, code);
+    }
+
+    fn language_menu(&mut self) {
+        let items: Vec<MenuItem> = LANGUAGES
+            .iter()
+            .map(|&(n, name, _)| MenuItem::new(name).enabled(self.disk.exists(60600 + n * 8)))
+            .collect();
+        if let Some(i) = self.host.menu("Language (speech stays English)", &items) {
+            let (n, _, code) = LANGUAGES[i];
+            if self.set_language(n) {
+                let _ = fs::create_dir_all(Self::save_dir());
+                let _ = fs::write(Self::language_path(), code);
+            }
+        }
+    }
+}
+
+/// The game's languages: number, own name, the locale code we store.
+const LANGUAGES: [(u16, &str, &str); 8] = [
+    (0, "English", "en_GB"),
+    (1, "Deutsch", "de"),
+    (2, "Français", "fr"),
+    (3, "English (US)", "en_US"),
+    (4, "Svenska", "sv"),
+    (5, "Italiano", "it"),
+    (6, "Português", "pt"),
+    (7, "Español", "es"),
+];
+
+/// A locale such as sv_SE.UTF-8 to the game's language number.
+fn language_from_locale(loc: &str) -> u16 {
+    let l = loc.to_ascii_lowercase();
+    let prefix = |p: &str| l.starts_with(p);
+    if prefix("en_us") {
+        3
+    } else if prefix("de") {
+        1
+    } else if prefix("fr") {
+        2
+    } else if prefix("sv") {
+        4
+    } else if prefix("it") {
+        5
+    } else if prefix("pt") {
+        6
+    } else if prefix("es") {
+        7
+    } else {
+        0
     }
 }

@@ -96,6 +96,7 @@ impl Sky {
         for slot in FIRST_TEXT_SEC..FIRST_TEXT_SEC + 8 {
             self.items[slot] = None;
         }
+        self.build_ui_labels();
         true
     }
 
