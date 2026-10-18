@@ -112,7 +112,13 @@ included.
   transcript, and writes its saves to `walkthrough/saves/` (SKY-VM.001 to
   .007, from the walkway to the first LINC entry). `--load=<save>
   --from=<line>` goes on from a save; `walkthrough/linc-ui.txt` tours the
-  LINC's pixel interface from save 7.
+  LINC's pixel interface from save 7. `walkthrough/to-end.txt` plays on
+  from save 7 to the end credits (about 58000 cycles, two seconds),
+  saving SKY-VM.008 to .023 at the story points; its comments name the
+  script variables the walkthroughs leave out. For digging into a stuck
+  scene: `RUST_LOG=script=trace,mcode=trace` traces every script command
+  and mcode call, and the walker's `vars`, `words`, `disasm`, `writes`
+  and `seq` steps read variables, compacts and the script modules.
 - Data: `reference/bass-cd-1.2/` (gitignored), or `TYPOSKY_DATA`.
 - Session log: `RUST_LOG=debug typosky 2>typosky.log`.
 

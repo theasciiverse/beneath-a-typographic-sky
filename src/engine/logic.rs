@@ -771,7 +771,7 @@ impl Sky {
             } else {
                 module[(script_no & 0x0FFF) as usize] as usize
             };
-            let mut a: u32 = 0;
+            let mut a: u32;
             let mut b: u32 = 0;
             let mut c: u32 = 0;
             loop {

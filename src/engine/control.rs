@@ -191,7 +191,7 @@ impl Sky {
     }
 
     /// ScummVM's canSaveGameStateCurrently and Control::loadSaveAllowed.
-    fn can_save(&self) -> bool {
+    pub(crate) fn can_save(&self) -> bool {
         let screen = self.vars[SCREEN as usize];
         self.sys.past_intro
             // texts get lost during load/save, so not while choosing

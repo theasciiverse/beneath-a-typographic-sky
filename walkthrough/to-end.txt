@@ -1,0 +1,474 @@
+# Beneath a Steel Sky (CD v0.0372), from Foster's first entry into the
+# LINC to the end of the game. Run with
+#   typosky walk walkthrough/to-end.txt --load=walkthrough/saves/SKY-VM.007
+#
+# Follows M. Shaw's walkthrough (Game Bytes Magazine issue 21, 1994,
+# www.ibiblio.org/GameBytes/issue21/misc/bass.html), checked against
+# "The Complete Beneath A Steel Sky Walkthrough" (FOURTYoz, Hitiek, Red,
+# OLiVER, 1994; bearstrong.net/tekst97/data/spill/bass/) where Shaw is
+# vague. Object names, dialogue lines and the order of things are the
+# ones the game actually shows (found with the hotspots step); where the
+# walkthroughs skip a condition the game's scripts check, the comment
+# says which script variable it is (names from ScummVM's debug.cpp).
+#
+# Steps: look/use/take/talk/exit <thing>, use <item> on <thing>,
+# choose <part of a line>, waitfor/waitgone <thing>, wait <cycles>,
+# settle, save <slot> <name>. `@name` is a compact's own name, for things
+# with no text or the same text twice. `waitvar <n> <value>` waits for a
+# script variable (13 is the mouse status: 6 when the player has control)
+# and `quick <step>` does not wait for things to settle, for the races.
+# See src/walk.rs.
+
+# --- LINC, first visit: the ball, the carpet bag, the documents ---------
+take ball                         # JOIN
+exit @door_r90
+use open on carpet bag
+take magnifying glass             # DECRYPT
+take birthday surprise            # DECOMPRESS
+use decompress on compressed data # two PASSWORDs
+use decrypt on @orders_menu       # the two documents with a question mark
+use decrypt on @report_menu
+exit @door_r91
+
+# --- The password room (92): nine slabs, five with a hole --------------
+# A password in a hole raises bridges: slab 1 joins 1-2, slab 2 joins
+# 1-4, slab 4 joins 2-5 and 4-5, slab 5 joins 2-3, 3-6 and 5-8, slab 3
+# joins 6-9 (bridge_a_on .. bridge_h_on). 4-7 and 7-8 are always there.
+use @red_menu on @slab1
+use @slab2
+use @green_menu on @slab2         # 1-4
+use @slab1
+use @red_circle                   # back in the inventory
+use @slab4
+use @red_menu on @slab4           # 2-5, 4-5
+use @slab5
+use @slab2
+use @green_circle
+use @slab5
+use @green_menu on @slab5         # 2-3, 3-6, 5-8
+use @slab4
+use @red_circle                   # 4-5 goes: round by 7 and 8
+use @slab7
+use @slab8
+use @slab5
+use @slab6
+use @slab3
+use @red_menu on @slab3           # 6-9
+use @slab6
+use @slab9
+exit @door_r92
+
+# --- Room 93: the bust and the book -------------------------------------
+take bust                         # PHOENIX
+take book                         # another DOCUMENT
+use decrypt on @adjust_menu
+point 160 0
+wait 3                            # the bar opens before the click counts
+use @read_menu                    # DISCONNECT
+expect room 10
+save 8 Out of the LINC, Phoenix program
+
+# --- The Security Services terminal: the briefing, Phoenix, Lamb -------
+# The keypad is pixels: button_0 .. button_9, cancel_button is EXIT.
+use id card on terminal
+use @button_4                     # SECURITY SERVICES (the jammer fools the retina scan)
+use @button_1                     # VIEW DOCUMENTS
+use @button_1                     # BRIEFING.DOC: Overmann, and his mother
+use @button_9                     #   (read_briefing: Mrs Piermont needs it)
+use @button_0
+use @button_2                     # REPORT.DOC: Lamb
+use @button_0
+use @button_3                     # PHOENIX.DOC
+use @button_0
+use @button_0
+use @button_2                     # SPECIAL OPERATIONS
+use @button_2                     # SPECIAL STATUS REQUEST: all sectors, 48 hours
+use @button_0
+use @button_2
+use @button_1                     # FILE ADJUSTMENT: Lamb's file
+use @button_2                     # FREEZE ASSETS
+use @button_1                     # AUTHORISE D-LINC
+use @cancel_button
+expect room 10
+
+# --- Lamb, stuck by the lift: his flat and the video ---------------------
+use id card on @lift_slot_10
+exit @left_exit_s9
+exit @right_exit_s6
+waitfor lamb                      # he comes to the lift and his card fails
+wait 400
+settle
+talk lamb
+choose problem
+choose another one                # Foster offers to feed Cous-Cous
+save 9 Lamb's flat authorised
+waitfor joey
+settle
+use id card on slot
+use elevator
+wait 40
+exit @left_exit_29
+exit @up_exit_28
+use id card on @lamb_slot
+use @lamb_door_20
+take video cassette
+expect item video
+exit @left_exit_21
+exit @down_exit_20
+
+# --- Down to the ground level ------------------------------------------
+waitfor joey
+settle
+use id card on @slot_28
+use @lift_28                      # Joey forgets his shell can't fly
+expect room 31
+expect item circuit board
+save 10 Ground level, Joey's board
+
+# --- The park: Mrs Piermont, the club, the shed --------------------------
+talk guard                        # Officer Blunt
+choose woman with the dog
+choose through that door          # the old cathedral, off-limits
+choose never mind
+exit @sc31_exit_30
+talk doorman                      # members only; a member must sponsor you
+choose join the club
+choose sponsor me                 # old widow Piermont
+choose see you later
+waitfor mrs piermont              # she walks Spunky round the park
+talk mrs piermont
+choose sponsor me                 # no: Foster is a stranger
+talk mrs piermont
+choose overmann                   # he was my father (read_briefing): she will
+                                  # sponsor him, and goes home to call the club
+exit @sc30_exit_33
+look @sc33_shed_door
+use id card on lock               # an old trick
+exit @sc33_shed_door
+take secateurs
+expect item secateurs
+exit @sc34_door
+exit @sc33_exit_32
+waitgone mrs piermont             # up in her lift
+wait 100
+use button                        # the intercom
+choose it's me
+choose father still alive
+choose professor working
+choose visit the club
+choose responsible for linc
+choose mother try to escape
+choose sponsor me now             # she goes to the phone
+use video cassette on vcr         # Spunky barks at the screen
+wait 600
+look dog bowl                     # biscuits and drool: now they can be taken
+take dog biscuits
+expect item biscuits
+exit @sc38_lift
+save 11 Sponsored, dog biscuits
+exit @sc32_exit_31
+use dog biscuits on plank
+exit @sc31_exit_30
+talk doorman                      # Mr Overmann is a member now
+choose never mind
+exit @sc30_exit_36                # the club, for a look
+exit @sc36_exit_30
+exit @sc30_exit_31
+waitvar 795 1                     # sc31_spunky_at_plank
+use rope                          # Spunky into the pool; Blunt goes to help
+exit @sc31_exit_39                # past the empty guard post
+save 12 In the cathedral
+
+# --- The cathedral: androids, and Anita ---------------------------------
+look dummies
+exit @sc39_exit_40
+use @sc40_locker_3                # Anita
+exit @sc40_exit_39
+exit @sc39_exit_31
+use id card on @sc31_lift_slot
+use @sc31_lift
+exit @right_exit_28
+use id card on slot
+use elevator
+
+# --- The reactor: Anita's LINC card -------------------------------------
+exit @factory_entry
+exit @fact1_right_exit
+exit @fact2_exit_right
+use @locker2                      # the middle locker
+use overalls                      # a radiation suit
+exit @fact3_exit_right
+use control panel
+use @button_2                     # OPEN REACTOR DOOR
+use @cancel_button
+exit @reactor_door
+take linc card
+expect item linc card
+exit @core_exit
+use control panel
+use @button_2                     # CLOSE DOOR
+use @cancel_button
+exit @entrance_exit
+use coat
+save 13 Anita's LINC card
+
+# --- LINC with Anita's card: the eyes, the tuning fork, the well --------
+exit @fact3_exit_left
+exit @fact2_exit_left
+exit @factory_exit
+exit @left_exit_s7
+exit @security_exit_s6
+use id card on @lobby_slot        # straight up to the interface room
+use linc card on @pod_light
+use interface
+expect room 90
+# A race: the first eye stays blind for 280 cycles, the second for 10
+# (fnPause in their scripts), and Foster must be past the second and back
+# round to the tuning fork beside the first before it opens. Each step
+# goes the moment the pointer is back (mouse status 6).
+quick use blind on eyeball
+waitvar 615 1                     # eye90_blinded
+waitvar 13 6
+quick exit @door_r90
+waitvar 13 6
+quick use blind on eyeball
+waitvar 618 1                     # eye91_blinded
+waitvar 13 6
+quick exit @door_t91              # past the Crusader...
+waitvar 13 6
+quick exit @door_t95              # ...and the well...
+waitvar 13 6
+quick exit @door_r94              # ...to the far side of the first room
+waitvar 13 6
+take tuning fork                  # OSCILLATOR
+quick exit @door_l90
+waitvar 13 6
+settle
+use playback on well              # Anita's message: Eduardo, the subway
+point 160 0
+wait 3
+use @read_menu
+expect room 10
+save 14 Anita's message, the oscillator
+
+# --- Eduardo, the court, Colston's fingerprints -------------------------
+use id card on @lift_slot_10
+exit @left_exit_s9
+exit @right_exit_s6
+use id card on slot
+use elevator
+exit @left_exit_29
+use id card on @slot_28
+use @lift_28
+expect room 31
+exit @sc31_exit_32
+talk gardener                     # dandelions are blue, he says...
+choose blue flowers
+choose see you later
+talk boy
+choose playing with
+choose other games                # ...Vincent: they're yellow, he's no gardener
+choose wear out
+talk gardener
+choose dandelions were blue       # sussed
+talk gardener
+choose anita
+talk gardener
+choose your name                  # Eduardo: the virus is in LINC-space
+exit @sc32_exit_31
+exit @sc31_exit_30
+exit @sc30_court_door             # Hobbins on trial; Foster defends him
+choose now then, officer blunt
+choose who lodged
+choose grievance
+choose examine the dog
+choose nature of your injuries
+choose how you got wet
+choose saw the accused
+choose how well do you know
+choose no further questions
+choose call mrs piermont
+choose complaint against
+choose witness the alleged
+choose describe your pet
+choose had you met hobbins
+choose no further
+choose question the defendant
+choose assault officer blunt
+choose pipe burst
+choose laugh at blunt
+choose no further                 # two hours community service
+save 15 After the trial
+exit @sc30_exit_36
+use jukebox
+choose you search                 # Colston hates this one...
+waitgone @sc36_colston            # ...and gets up to change it
+take glass
+expect item glass
+exit @sc36_exit_30
+exit @sc30_exit_31
+use id card on @sc31_lift_slot
+use @sc31_lift
+exit @left_exit_28
+exit @left_exit_19
+exit @left_exit_26
+give glass to burke               # his prints on Foster's hands
+exit @right_exit_27
+exit @right_exit_26
+exit @right_exit_19
+use id card on @slot_28
+use @lift_28
+exit @sc31_exit_30
+exit @sc30_exit_36
+use metal plate                   # the club's back door knows Colston's thumb
+
+# --- The wine cellar, and down into the subway --------------------------
+use metal bar on packing case
+take wooden lid
+use box                           # the lid on the flimsy box...
+use box                           # ...and Foster on top
+use metal bar on grill
+use secateurs on grill
+save 16 Cellar, the grill open
+exit narrow passage
+exit @sc44_exit_45
+exit @sc45_exit_47
+exit @sc47_exit_48
+use light bulb on socket          # light keeps the thing in the hole away
+exit @sc48_exit_65
+save 17 Subway, before the collapsing tunnel
+exit @sc65_exit_66                # the roof comes down: straight on
+exit @sc66_hole
+
+# --- LINC's underworld: the vein, the incubator, Joey as a medical robot -
+use metal bar on plaster
+use metal bar on brickwork
+take brick
+use metal bar on swelling
+use brick on crowbar stuck        # a hole in the vein: the medical robot comes
+waitfor @sc67_crowbar
+take metal bar
+exit @sc67_door                   # out while the robot holds the door
+save 18 Through the repair robot's door
+exit @sc68_stairs
+use control unit
+use @button_2                     # REDUCE TEMPERATURE: the cover closes
+use @sc70_iris                    # stand on it...
+use @sc70_bar                     # ...and pull: the grill above works loose
+exit @sc70_door
+exit @sc68_exit
+exit @sc69_door
+use circuit board on slot         # Joey in the medical robot
+choose other humans
+choose stay close
+exit @sc71_door69
+exit @sc69_exit
+use @sc68_grill                   # a look into the tank room
+click 160 100 left
+waitroom 68
+waitfor joey
+settle
+talk joey
+choose tank room
+waitfor joey                      # back from the tank room
+settle
+talk joey
+choose report
+talk joey
+choose nutrient tank
+choose open the tap               # the android goes to stop the leak...
+waitfor joey
+settle
+save 19 Joey opened the tap
+exit @sc68_exit
+exit @sc69_door
+exit @sc71_door72                 # ...and falls through the loose grill
+exit @sc72_exit
+exit @sc73_door
+use id card on @sc74_terminal
+use @button_2                     # ACCESS TO RESTRICTED AREA
+use @button_1                     # OPEN DOOR
+use @cancel_button
+exit @sc74_door                   # Gallagher; Joey dies stopping him
+use corpse                        # Gallagher's LINC card
+use robot                         # Joey's board, again
+save 20 Gallagher dead, his card
+
+# --- LINC, last visits: Divine Wrath, the crystal, the virus ------------
+exit @sc73_door
+use @gallcard_menu on @sc74_int_slot
+use interface
+expect room 90
+exit @door_r90
+waitvar 13 6
+quick use blind on eyeball
+waitvar 618 1
+waitvar 13 6
+quick exit @door_t91
+waitvar 13 6
+settle
+use divine wrath on crusader
+point 160 0
+wait 3
+use @read_menu
+expect room 74
+use @anita_card_menu on @sc74_int_slot
+use interface
+expect room 90
+exit @door_r90
+waitvar 13 6
+quick use blind on eyeball
+waitvar 618 1
+waitvar 13 6
+quick exit @door_t91
+waitvar 13 6
+settle
+exit @door_r95                    # where the Crusader stood
+use oscillator on crystal
+take helix                        # the VIRUS, on Anita's card
+point 160 0
+wait 3
+use @read_menu
+expect room 74
+save 21 The virus on Anita's card
+
+# --- The android works, Ken, and LINC's heart --------------------------
+exit @sc74_door
+exit @sc73_big_door
+use @anita_card_menu on console   # the virus crashes the program
+take tongs
+use tongs on @sc75_live_tank      # living tissue...
+use @tongs_menu on @sc75_nitro_tank  # ...frozen
+exit @sc75_door
+use @sc76_cabinet_2               # the middle android
+use circuit board on @sc76_cabinet_2
+use @sc76_console_2
+use @button_2                     # DOWNLOAD CHARACTER DATA
+use @button_0
+use @button_3                     # RUN STARTUP PROGRAM: Joey in a body
+choose new name                   # Ken
+choose close to linc
+choose saving me
+choose new body
+choose never mind
+save 22 Ken
+exit @sc76_door77
+waitfor ken
+settle
+talk ken
+quick choose hand on that lock    # Ken holds his for 30 cycles, Foster his for
+waitvar 13 6                      # 20, and the door wants both at once
+use @sc77_hand_1
+expect room 77
+exit @sc77_big_door
+exit @sc78_exit
+use cable on pipe support
+use rungs
+use tongs on orifice              # the frozen flesh poisons the sludge
+use cable                         # swing across: Foster's father
+save 23 LINC's core, father
+talk ken
+quick choose sit in that chair    # Ken takes Overmann's place; the end plays
+waittext goodbye, friends         # Hobbins' office, later
+waittext copyright 1994           # the end credits (they repeat)
+frame the-end

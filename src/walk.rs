@@ -14,10 +14,12 @@
 //!   be another inventory item
 //! - `look <item> in inventory`: left click an item in the inventory bar
 //! - `choose <part of a dialogue line>`: click a line of the chooser
-//! - `click <x> <y> [left|right]`: a click at screen pixels; `point <x> <y>`
-//!   only moves the pointer
+//! - `click <x> <y> [left|right]`: a click at screen pixels (`tap`: the same
+//!   without waiting for things to settle); `point <x> <y>` only moves the
+//!   pointer
 //! - `wait <cycles>`, `settle`, `waitfor <thing>`, `waitgone <thing>`,
-//!   `waitroom <n>`, `waittext <part>`
+//!   `waitroom <n>`, `waittext <part>`, `waitvar <n> <value>` (a script
+//!   variable, numbered as in ScummVM's debug.cpp)
 //! - `expect room <n>`, `expect item <item>`
 //! - `save <slot> <description>`: writes SKY-VM.<slot> to the save folder
 //! - `frame <name>`: writes the screen as <name>.png to the frame folder
@@ -26,7 +28,8 @@
 //!   coming and going and writes a frame every so often
 //!
 //! After each action the walker runs the game until the player has control
-//! again and Foster has stood still for a second with nobody speaking.
+//! again and Foster has stood still for a second with nobody speaking;
+//! `quick <step>` goes straight on instead, for the races.
 //!
 //! A thing is matched by its pointer text, case-insensitive: exactly
 //! first, then as a part. `@name` matches the compact's own name instead
@@ -74,6 +77,8 @@ pub struct Walker {
     /// stop when Foster is in the LINC
     pub until_linc: bool,
     step_no: usize,
+    /// `quick <step>`: the step does not wait for things to settle
+    quick: bool,
 }
 
 /// LINC space is rooms 90 and up (the death screen is 102).
@@ -95,6 +100,7 @@ impl Walker {
             transcript: Vec::new(),
             until_linc: false,
             step_no: 0,
+            quick: false,
         })
     }
 
@@ -306,6 +312,9 @@ impl Walker {
     /// settled: the pointer is on, nobody is speaking and Foster has
     /// stood still for a second.
     pub fn settle(&mut self, what: &str) -> Result<(), String> {
+        if self.quick {
+            return Ok(());
+        }
         let mut last = self.signature();
         let mut still = 0;
         for _ in 0..TIMEOUT {
@@ -327,13 +336,13 @@ impl Walker {
             }
             last = sig;
         }
-        Err(self.stuck(what))
+        Err(self.stuck(what, TIMEOUT))
     }
 
-    fn stuck(&mut self, what: &str) -> String {
+    fn stuck(&mut self, what: &str, cycles: u32) -> String {
         let c = self.sky.cpt_start(ID_FOSTER);
         format!(
-            "{what}: stuck after {TIMEOUT} cycles in room {}; texts {:?}; mouse status {} stop {}; Foster logic {} mode {} at {},{}",
+            "{what}: stuck after {cycles} cycles in room {}; texts {:?}; mouse status {} stop {}; Foster logic {} mode {} at {},{}",
             self.room(),
             self.texts(),
             self.sky.vars[MOUSE_STATUS as usize],
@@ -356,7 +365,7 @@ impl Walker {
             }
             self.tick();
         }
-        Err(self.stuck(what))
+        Err(self.stuck(what, cycles))
     }
 
     // ----- inventory ------------------------------------------------------
@@ -379,11 +388,14 @@ impl Walker {
         let spec = item.to_ascii_lowercase();
         for _ in 0..12 {
             let items = self.inventory_items();
-            let found = items
-                .iter()
-                .find(|h| h.text.to_ascii_lowercase() == spec)
-                .or_else(|| items.iter().find(|h| h.text.to_ascii_lowercase().contains(&spec)))
-                .cloned();
+            let found = match spec.strip_prefix('@') {
+                Some(name) => items.iter().find(|h| h.name.to_ascii_lowercase() == name),
+                None => items
+                    .iter()
+                    .find(|h| h.text.to_ascii_lowercase() == spec)
+                    .or_else(|| items.iter().find(|h| h.text.to_ascii_lowercase().contains(&spec))),
+            }
+            .cloned();
             if let Some(h) = found {
                 let (x, y) = ((h.x0 + h.x1) as u16 / 2, (h.y0 + h.y1) as u16 / 2);
                 if button == LEFT {
@@ -446,6 +458,11 @@ impl Walker {
     }
 
     pub fn save(&mut self, slot: u16, description: &str) -> Result<(), String> {
+        // the game's own rule: a save taken with the chooser up comes back
+        // with Foster waiting for lines that are gone
+        if !self.sky.can_save() {
+            return Err(format!("the game does not allow saving here (room {})", self.room()));
+        }
         fs::create_dir_all(&self.saves).map_err(|e| e.to_string())?;
         let path = self.saves.join(format!("SKY-VM.{slot:03}"));
         fs::write(&path, self.sky.prepare_save_data()).map_err(|e| e.to_string())?;
@@ -479,6 +496,17 @@ impl Walker {
         self.step_no += 1;
         let room = self.room();
         self.say(format!("{:4} [room {room:3}, cycle {:6}] {line}", self.step_no, self.cycle));
+        if let Some(rest) = line.strip_prefix("quick ") {
+            // for a race (the LINC's second eye): act, and go straight on
+            self.quick = true;
+            let r = self.step_inner(rest);
+            self.quick = false;
+            return r;
+        }
+        self.step_inner(line)
+    }
+
+    fn step_inner(&mut self, line: &str) -> Result<(), String> {
         let (verb, rest) = line.split_once(' ').unwrap_or((line, ""));
         let rest = rest.trim();
         let lower = rest.to_ascii_lowercase();
@@ -497,11 +525,16 @@ impl Walker {
                     return Err(format!("{line}: picking {item:?} did not give a held object"));
                 }
                 // another inventory item: click it while the bar is open
+                // (`@name` for the compact's name, as two items can share a text)
                 let target = thing.to_ascii_lowercase();
-                let in_bar = self
-                    .inventory_items()
-                    .into_iter()
-                    .find(|h| h.id as u32 != self.sky.vars[OBJECT_HELD as usize] && h.text.to_ascii_lowercase().contains(&target));
+                let held = self.sky.vars[OBJECT_HELD as usize];
+                let in_bar = self.inventory_items().into_iter().find(|h| {
+                    h.id as u32 != held
+                        && match target.strip_prefix('@') {
+                            Some(name) => h.name.to_ascii_lowercase() == name,
+                            None => h.text.to_ascii_lowercase().contains(&target),
+                        }
+                });
                 if let Some(h) = in_bar {
                     self.say(format!("    (use on {} in the inventory)", h.name));
                     let (x, y) = ((h.x0 + h.x1) as u16 / 2, (h.y0 + h.y1) as u16 / 2);
@@ -522,6 +555,10 @@ impl Walker {
                 let room = self.room();
                 for _ in 0..4 {
                     self.act(rest, RIGHT, line)?;
+                    if self.quick {
+                        // no settling: go on the moment the room changes
+                        return self.wait_until_for(line, 400, |w| w.room() != room);
+                    }
                     if self.room() != room || (self.until_linc && in_linc(&self.sky)) {
                         return Ok(());
                     }
@@ -564,11 +601,15 @@ impl Walker {
                 self.click(x, y, RIGHT);
                 self.settle(line)
             }
-            "click" => {
+            "click" | "tap" => {
+                // `tap` clicks without waiting for things to settle
                 let a: Vec<&str> = rest.split_whitespace().collect();
                 let (x, y) = (num(a.first().copied().unwrap_or(""))?, num(a.get(1).copied().unwrap_or(""))?);
                 let b = if a.get(2) == Some(&"left") { LEFT } else { RIGHT };
                 self.click(x as u16, y as u16, b);
+                if verb == "tap" {
+                    return Ok(());
+                }
                 self.settle(line)
             }
             "point" => {
@@ -592,6 +633,11 @@ impl Walker {
                 // Foster, Joey and any hotspots named
                 let mut ids = vec![ID_FOSTER, ID_JOEY];
                 for spec in rest.split(',').map(str::trim).filter(|s| !s.is_empty()) {
+                    // `@name` finds any compact, here or not
+                    if let Some(id) = spec.strip_prefix('@').and_then(|n| self.sky.cpt.find(n)) {
+                        ids.push(id as u32);
+                        continue;
+                    }
                     let h = self.find(spec).ok_or_else(|| self.not_found(spec))?;
                     ids.push(h.id as u32);
                 }
@@ -608,6 +654,102 @@ impl Walker {
                 let v = &self.sky.vars;
                 let line = format!("    mouse status {} stop {} button {} special {}", v[MOUSE_STATUS as usize], v[MOUSE_STOP as usize], v[BUTTON as usize], v[SPECIAL_ITEM as usize]);
                 self.say(line);
+                Ok(())
+            }
+            "vars" => {
+                // `vars <first> [last]`: script variables by number (the
+                // names are in ScummVM's debug.cpp, scriptVars)
+                let a: Vec<&str> = rest.split_whitespace().collect();
+                let first = num(a.first().copied().unwrap_or(""))? as usize;
+                let last = a.get(1).map_or(Ok(first as u32), |s| num(s))? as usize;
+                let vals: Vec<String> = (first..=last).map(|i| format!("{i}={}", self.sky.vars[i])).collect();
+                self.say(format!("    vars {}", vals.join(" ")));
+                Ok(())
+            }
+            "seq" => {
+                // `seq <word> <word> ...`: where that run of words is in the
+                // script modules
+                let want: Vec<u16> = rest.split_whitespace().map(|s| num(s).map(|v| v as u16)).collect::<Result<_, _>>()?;
+                for m in 0..16u16 {
+                    let Some(bytes) = self.sky.disk.load((F_MODULE_0 + m as u32) as u16) else { continue };
+                    let w: Vec<u16> = bytes.chunks_exact(2).map(|b| u16::from_le_bytes([b[0], b[1]])).collect();
+                    for i in 0..w.len().saturating_sub(want.len()) {
+                        if w[i..i + want.len()] == want[..] {
+                            self.say(format!("    module {m} @{i}"));
+                        }
+                    }
+                }
+                Ok(())
+            }
+            "writes" => {
+                // `writes <var>`: every pop_var into that script variable in
+                // the script modules, with the commands just before it
+                // (`writes push <n>`: every push of that number instead)
+                // (`writes read <var>`: every push_var of it)
+                let (op, var) = match (rest.strip_prefix("push "), rest.strip_prefix("read ")) {
+                    (Some(n), _) => (2, num(n)? as u16),
+                    (_, Some(n)) => (0, num(n)? as u16),
+                    _ => (6, num(rest)? as u16),
+                };
+                for m in 0..16u16 {
+                    let Some(bytes) = self.sky.disk.load((F_MODULE_0 + m as u32) as u16) else { continue };
+                    let w: Vec<u16> = bytes.chunks_exact(2).map(|b| u16::from_le_bytes([b[0], b[1]])).collect();
+                    for i in 1..w.len() {
+                        if w[i - 1] == op && w[i] == if op == 2 { var } else { var * 4 } {
+                            let before: Vec<String> = w[i.saturating_sub(9)..i - 1].iter().map(|v| v.to_string()).collect();
+                            self.say(format!("    module {m} @{}: pop_var {var} after [{}]", i - 1, before.join(" ")));
+                        }
+                    }
+                }
+                Ok(())
+            }
+            "disasm" => {
+                // `disasm <module> <from> <to>`: script commands by word offset
+                let a: Vec<&str> = rest.split_whitespace().collect();
+                let m = num(a.first().copied().unwrap_or(""))?;
+                let (from, to) = (num(a.get(1).copied().unwrap_or(""))? as usize, num(a.get(2).copied().unwrap_or(""))? as usize);
+                let bytes = self.sky.disk.load((F_MODULE_0 + m) as u16).ok_or("no such module")?;
+                let w: Vec<u16> = bytes.chunks_exact(2).map(|b| u16::from_le_bytes([b[0], b[1]])).collect();
+                let names = [
+                    "push_var", "less_than", "push", "not_equal", "if_and", "skip_zero", "pop_var", "minus", "plus", "skip_always", "if_or", "call_mcode",
+                    "more_than", "exit13", "switch", "push_offset", "pop_offset", "is_equal", "skip_nz", "exit", "restart",
+                ];
+                // the scripts starting in the range (the module starts with
+                // a table of script offsets)
+                let starts: Vec<String> =
+                    (0..w.len().min(w[0] as usize)).filter(|&i| (from..to).contains(&(w[i] as usize))).map(|i| format!("{:#06x}@{}", (m << 12) as usize | i, w[i])).collect();
+                self.say(format!("    scripts here: {}", starts.join(" ")));
+                let mut pc = from;
+                while pc < to.min(w.len()) {
+                    let op = w[pc] as usize;
+                    let (args, n): (String, usize) = match op {
+                        0 | 6 => (format!("var {}", w[pc + 1] / 4), 1),
+                        2 | 15 | 16 => (format!("{}", w[pc + 1]), 1),
+                        5 | 9 | 18 => (format!("-> {}", (pc as isize + 2 + (w[pc + 1] as i16 / 2) as isize)), 1),
+                        11 => (format!("{} args, mcode {}", w[pc + 1], w[pc + 2] / 4), 2),
+                        14 => {
+                            let k = w[pc + 1] as usize;
+                            let cases: Vec<String> = (0..k).map(|j| format!("{}=>{}", w[pc + 2 + 2 * j], pc + 3 + 2 * j + w[pc + 3 + 2 * j] as usize / 2)).collect();
+                            let d = pc + 2 + 2 * k;
+                            (format!("[{}] default {}", cases.join(" "), d + w[d] as usize / 2), 2 + 2 * k)
+                        }
+                        _ => (String::new(), 0),
+                    };
+                    let name = names.get(op).copied().unwrap_or("?");
+                    self.say(format!("    {pc:5}: {name} {args}"));
+                    pc += 1 + n;
+                }
+                Ok(())
+            }
+            "words" => {
+                // `words name, ...`: a compact's words as they are now
+                for name in rest.split(',').map(str::trim).filter(|s| !s.is_empty()) {
+                    let id = self.sky.cpt.find(name).ok_or_else(|| format!("no compact {name:?}"))?;
+                    let size = self.sky.cpt.entry(id).map_or(0, |e| e.size as usize);
+                    let p = self.sky.cpt_start(id as u32);
+                    let words: Vec<String> = (0..size).map(|i| format!("{:04x}", self.sky.w(p + i))).collect();
+                    self.say(format!("    {name} ({id:#06x}): {}", words.join(" ")));
+                }
                 Ok(())
             }
             "film" => {
@@ -643,6 +785,12 @@ impl Walker {
                 let r = num(rest)?;
                 self.wait_until(line, |w| w.room() == r)?;
                 self.settle(line)
+            }
+            "waitvar" => {
+                // `waitvar <n> <value>`: until script variable n has the value
+                let a: Vec<&str> = rest.split_whitespace().collect();
+                let (n, v) = (num(a.first().copied().unwrap_or(""))? as usize, num(a.get(1).copied().unwrap_or(""))?);
+                self.wait_until(line, |w| w.sky.vars[n] == v)
             }
             "waittext" => {
                 let spec = lower.clone();
@@ -790,6 +938,10 @@ pub fn walk(dir: &Path, args: &[String]) {
 mod tests {
     use super::*;
 
+    /// One whole game at a time: the walkthrough tests run in parallel
+    /// otherwise, and three games at once can pass a memory cap.
+    static ONE_GAME: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
     fn data() -> Option<PathBuf> {
         let d = std::env::var_os("TYPOSKY_DATA")
             .map(PathBuf::from)
@@ -804,6 +956,7 @@ mod tests {
         let Some(dir) = data() else { return };
         let script = include_str!("../walkthrough/to-linc.txt");
         assert!(script.contains("test stops here"), "the script lost its marker");
+        let _one = ONE_GAME.lock().unwrap_or_else(|e| e.into_inner());
         let lines: Vec<String> =
             script.lines().take_while(|l| !l.contains("test stops here")).map(str::to_string).collect();
         let mut w = Walker::new(&dir).unwrap();
@@ -816,5 +969,55 @@ mod tests {
             panic!("{e}\n{}", w.transcript.join("\n"));
         }
         assert_eq!(w.room(), 14, "Foster should be with Anita in the reactor lobby");
+    }
+
+    /// Restores a save of the second script and plays its lines from the
+    /// one after `save <from>` up to `save <to>` (or the end).
+    fn play_from_save(dir: &Path, from: u16, to: Option<u16>) -> Walker {
+        let script = include_str!("../walkthrough/to-end.txt");
+        let lines: Vec<String> = script
+            .lines()
+            .skip_while(|l| !l.starts_with(&format!("save {from} ")))
+            .skip(1)
+            .take_while(|l| to.is_none_or(|t| !l.starts_with(&format!("save {t} "))))
+            .map(str::to_string)
+            .collect();
+        assert!(!lines.is_empty(), "no save {from} in to-end.txt");
+        let save = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(format!("walkthrough/saves/SKY-VM.{from:03}"));
+        let mut w = Walker::new(dir).unwrap();
+        w.quiet = true;
+        w.saves = std::env::temp_dir().join(format!("typosky-walk-test-{}-{from}", std::process::id()));
+        w.sky.restore_data(&std::fs::read(&save).unwrap()).unwrap();
+        for _ in 0..5 {
+            w.tick();
+        }
+        let result = w.run(&lines, 1, None);
+        std::fs::remove_dir_all(&w.saves).ok();
+        if let Err(e) = result {
+            panic!("{e}\n{}", w.transcript.join("\n"));
+        }
+        w
+    }
+
+    /// The LINC with Anita's card (save 13): the race past both eyes for
+    /// the tuning fork, and the message in the well.
+    #[test]
+    fn walkthrough_linc_race() {
+        let Some(dir) = data() else { return };
+        let _one = ONE_GAME.lock().unwrap_or_else(|e| e.into_inner());
+        let w = play_from_save(&dir, 13, Some(14));
+        assert_eq!(w.room(), 10, "Foster should be back at the Security Services interface");
+        assert!(w.transcript.iter().any(|l| l.contains("The agent's name is EDUARDO")), "Anita's message did not play");
+    }
+
+    /// LINC's core (save 23): Ken takes the chair, the ending plays and the
+    /// credits roll.
+    #[test]
+    fn walkthrough_ending() {
+        let Some(dir) = data() else { return };
+        let _one = ONE_GAME.lock().unwrap_or_else(|e| e.into_inner());
+        let w = play_from_save(&dir, 23, None);
+        assert_eq!(w.room(), 85, "the credits should be rolling");
+        assert!(w.transcript.iter().any(|l| l.contains("Goodbye, friends")));
     }
 }
