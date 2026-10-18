@@ -236,13 +236,11 @@ impl TermHost {
                 let area = buf.area;
                 if x < area.right() && y < area.bottom() {
                     let cell = &mut buf[(x, y)];
-                    let under = match cell.bg {
-                        Color::Rgb(r, g, b) => Color::Rgb(r / 4, g / 4, b / 4),
-                        _ => Color::Black,
-                    };
+                    // blended with the picture, like the typed text
+                    let (glyph, under) = blend_letter(cell, [255, 214, 90]);
                     cell.set_char(ch)
-                        .set_fg(Color::Rgb(255, 214, 90))
-                        .set_bg(under)
+                        .set_fg(rgb(glyph))
+                        .set_bg(rgb(under))
                         .set_style(Style::default().add_modifier(Modifier::BOLD));
                 }
             }

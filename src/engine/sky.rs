@@ -152,6 +152,8 @@ pub struct Sky {
     /// the terminal game: start menu once the intro has been seen, and an
     /// autosave on quit (off for tests and tools)
     pub front_end: bool,
+    /// the last state the autosave could safely use (save data)
+    pub(crate) last_safe: Option<Vec<u8>>,
 }
 
 impl Sky {
@@ -196,6 +198,7 @@ impl Sky {
             key_pressed: false,
             quit: false,
             front_end: false,
+            last_safe: None,
         };
         sky.init();
         Ok(sky)
@@ -472,6 +475,7 @@ impl Sky {
 
     /// One game cycle (80 ms at normal speed), without the wait.
     pub fn tick(&mut self) {
+        self.note_safe_moment();
         self.audio_check_fx_queue();
         self.mouse_engine();
         self.handle_key();

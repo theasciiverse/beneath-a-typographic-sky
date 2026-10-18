@@ -190,9 +190,33 @@ impl Sky {
         Ok(())
     }
 
+    /// ScummVM's canSaveGameStateCurrently and Control::loadSaveAllowed.
     fn can_save(&self) -> bool {
-        // as ScummVM: not while choosing dialogue or before the intro ends
-        self.sys.system_flags & SF_CHOOSING == 0 && self.sys.past_intro
+        let screen = self.vars[SCREEN as usize];
+        self.sys.past_intro
+            // texts get lost during load/save, so not while choosing
+            && self.sys.system_flags & SF_CHOOSING == 0
+            // the same problem with LINC terminals
+            && screen < 101
+            // not in the final rooms
+            && !(screen >= 82 && screen != 85 && screen < 90)
+    }
+
+    /// Safe to autosave: saving allowed, not the death screen, and no game
+    /// text up (a restore switches text off, so a LINC panel saved open
+    /// would come back empty).
+    fn autosave_safe(&self) -> bool {
+        self.can_save()
+            && self.vars[SCREEN as usize] != 102
+            && (CPT_TEXT_1..=CPT_TEXT_11).all(|id| self.g(self.cpt_start(id), super::sky::f::STATUS) == 0)
+    }
+
+    /// Called every game cycle by the terminal game: remembers the last
+    /// moment the autosave could safely be taken.
+    pub(crate) fn note_safe_moment(&mut self) {
+        if self.front_end && self.autosave_safe() {
+            self.last_safe = Some(self.prepare_save_data());
+        }
     }
 
     /// The options panel (F5).
@@ -365,10 +389,17 @@ impl Sky {
     /// start menu can continue from there. Not on the death screen, and
     /// not where the game itself forbids saving.
     pub(crate) fn autosave_on_quit(&mut self) {
-        if !self.front_end || !self.can_save() || self.vars[SCREEN as usize] == 102 {
+        if !self.front_end {
             return;
         }
-        match self.save_game(0, "Autosave") {
+        // now if it is safe, else the last safe moment, else not at all
+        let data = if self.autosave_safe() { Some(self.prepare_save_data()) } else { self.last_safe.take() };
+        let Some(data) = data else {
+            log::debug!("no safe moment to autosave");
+            return;
+        };
+        let result = fs::create_dir_all(Self::save_dir()).and_then(|_| fs::write(Self::slot_path(0), data));
+        match result {
             Ok(()) => log::debug!("autosaved"),
             Err(e) => log::warn!("autosave failed: {e}"),
         }
