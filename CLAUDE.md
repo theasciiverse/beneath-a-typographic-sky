@@ -15,6 +15,16 @@ point. Own git repo, not on GitHub yet.
 
 ## Name
 
+Decided by David, 2026-10-18: the title is **Beneath a Typographic Sky**,
+the binary `typosky`, the catalog id, archive and repository name
+`beneath-a-typographic-sky`. Collision check (2026-10-18): no use of
+either name on the web, GitHub, crates.io, Debian packages or the
+Asciiverse catalog. Revolution has a US trademark filing for "BEYOND A
+STEEL SKY" (serial 79304812, 2021); its full list of marks was not
+readable (Justia blocks automated access). Courtesy email to Revolution
+drafted 2026-10-18 (David's Gmail, to press@revolution.co.uk), not sent
+yet.
+
 Beneath a Steel Sky → Beneath a Typographic Sky. The swap names the medium:
 the city of Union City rebuilt out of characters. It reads as a clear tribute
 and explains the concept without needing context.
