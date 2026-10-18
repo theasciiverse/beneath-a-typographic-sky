@@ -772,10 +772,11 @@ impl Sky {
                 module[(script_no & 0x0FFF) as usize] as usize
             };
             let mut a: u32;
-            let mut b: u32;
+            let mut b: u32 = 0;
             let mut c: u32 = 0;
             loop {
                 let command = module[pc];
+                log::trace!(target: "script", "{:#06x} {script_no:#06x} @{pc}: {command} {} stack {:?}", self.vars[CUR_ID as usize], module.get(pc + 1).copied().unwrap_or(0), &self.stack);
                 pc += 1;
                 match command {
                     0 => {
@@ -818,9 +819,10 @@ impl Sky {
                         }
                     }
                     6 => {
-                        // pop_var
-                        let v = self.pop();
-                        self.vars[module[pc] as usize / 4] = v;
+                        // pop_var (the original leaves the value in b too,
+                        // which a following call_mcode can pass on)
+                        b = self.pop();
+                        self.vars[module[pc] as usize / 4] = b;
                         pc += 1;
                     }
                     7 => {
@@ -852,8 +854,12 @@ impl Sky {
                         let n = module[pc];
                         pc += 1;
                         assert!(n <= 3);
-                        a = 0;
-                        b = 0;
+                        // as the original: a holds the count until popped,
+                        // and b and c keep whatever the last command left
+                        // in them when fewer are pushed (Foster's arrival on
+                        // the ground floor sends Joey's sync with one
+                        // argument and relies on the stale b)
+                        a = n as u32;
                         // the original falls through from 3 to 1
                         if n >= 3 {
                             c = self.pop();
@@ -867,6 +873,8 @@ impl Sky {
                         let mcode = module[pc] / 4;
                         pc += 1;
                         let saved = self.compact;
+                        // ScummVM's Debug::mcode
+                        log::trace!(target: "mcode", "{:#06x} {script_no:#06x}: mcode {mcode}({a}, {b}, {c}) {n} args", self.vars[CUR_ID as usize]);
                         let ret = self.mcode(mcode, a, b, c);
                         self.compact = saved;
                         if !ret || self.quit {
@@ -880,8 +888,9 @@ impl Sky {
                         self.push((a < b) as u32);
                     }
                     14 => {
-                        // switch
+                        // switch (the original leaves the number of cases in c)
                         let mut s = module[pc];
+                        c = s as u32;
                         pc += 1;
                         a = self.pop();
                         loop {
