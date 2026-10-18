@@ -4,7 +4,7 @@
 # readme.txt (its licence asks that the readme travels with the data),
 # NOTICE and LICENSE:
 #
-#   typosky             the game (typosky.exe on Windows)
+#   typosky             the game, stripped (typosky.exe on Windows)
 #   data/sky.dsk        Beneath a Steel Sky CD v0.0372, unmodified
 #   data/sky.dnr
 #   data/sky.cpt
@@ -49,6 +49,18 @@ src="$cache/unzipped/bass-cd-1.2"
 stage="stage/$id"
 rm -rf "$stage" && mkdir -p "$stage/data"
 cp "$bin" "$stage/"
+# release archives carry a stripped binary (David, 2026-10-18); local
+# builds keep their debug symbols. STRIP overrides the tool.
+strip_tool="${STRIP:-}"
+if [ -z "$strip_tool" ]; then
+  case "$target" in
+    *windows-gnu*) strip_tool=x86_64-w64-mingw32-strip ;;
+    aarch64*linux*) strip_tool=aarch64-linux-gnu-strip ;;
+    *) strip_tool=strip ;;
+  esac
+  command -v "$strip_tool" >/dev/null 2>&1 || strip_tool=llvm-strip
+fi
+"$strip_tool" "$stage/typosky$exe" || { echo "package.sh: $strip_tool failed on typosky$exe" >&2; exit 1; }
 for f in sky.dsk sky.dnr sky.cpt readme.txt; do
   cp "$src/$f" "$stage/data/"
 done

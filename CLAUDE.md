@@ -144,7 +144,9 @@ licence (`readme.txt`, shipped beside it); see `NOTICE`.
   `typosky`, `data/` (sky.dsk, sky.dnr, sky.cpt and Revolution's
   readme.txt, which the licence says must travel with them), `NOTICE`,
   `LICENSE`. The data comes from `reference/bass-cd-1.2.zip` or is
-  downloaded from scummvm.org, sha256-checked either way. About 78 MB.
+  downloaded from scummvm.org, sha256-checked either way. The binary is
+  stripped in the archive (about 3 MB); local builds keep debug symbols.
+  About 71 MB in all, nearly all of it the game data.
 - Session log: `RUST_LOG=debug typosky 2>typosky.log`.
 
 ## Rendering approach (original notes, 2026-10-03; see Status for what was built)
