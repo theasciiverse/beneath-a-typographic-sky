@@ -65,7 +65,9 @@ Collision check not yet done.
 
 The crate is GPL-3.0-or-later because the engine is a port of ScummVM's
 GPL code (engines/sky), kept faithful, workarounds and their comments
-included.
+included. Confirmed by David 2026-10-18; `LICENSE` is the GPL v3
+text from gnu.org. The game data stays under Revolution's freeware
+licence (`readme.txt`, shipped beside it); see `NOTICE`.
 
 - `src/engine/`: the engine. All of ScummVM's sky classes are one `Sky`
   struct (sky.rs); each original class is an `impl Sky` file: logic.rs
