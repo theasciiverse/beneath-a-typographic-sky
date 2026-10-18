@@ -24,6 +24,7 @@ fn play(args: &[String]) {
     let host = match term::app::TermHost::new() {
         Ok(mut h) => {
             h.audio = !args.iter().any(|a| a == "--mute");
+            h.game_font = args.iter().any(|a| a == "--game-font");
             h.splash(
                 &[
                     "BENEATH A TYPOGRAPHIC SKY",
@@ -53,7 +54,7 @@ fn play(args: &[String]) {
             std::process::exit(1);
         }
     };
-    sky.screen.text_pixels = false;
+    sky.screen.text_pixels = args.iter().any(|a| a == "--game-font");
     sky.front_end = true;
     let skip_intro = args.iter().any(|a| a == "--skip-intro");
     sky.run(skip_intro);
@@ -72,13 +73,13 @@ fn main() {
         Some("walk") => walk::walk(&data_dir(), &args[1..]),
         Some("modes") => tools::modes(&args[1..]),
         Some("glyphs") => tools::glyphs(&data_dir(), &args[1..]),
-        None | Some("play") | Some("--skip-intro") | Some("--mute") => play(&args),
+        None | Some("play") | Some("--skip-intro") | Some("--mute") | Some("--game-font") => play(&args),
         Some("sfx") => audio_tools::sfx(&data_dir(), &args[1..]),
         Some("speech") => audio_tools::speech(&data_dir(), &args[1..]),
         Some("music") => music_tool::music(&data_dir(), &args[1..]),
         _ => {
             eprintln!(
-                "usage: typosky [play] [--skip-intro] [--mute]
+                "usage: typosky [play] [--skip-intro] [--mute] [--game-font]
        typosky dump <files|cpts|screens|rooms> [out dir]
        typosky look <room> <braille|half> <cols> <rows> [out dir]
        typosky headless [--intro|--floppy] [--every-ms=N] [--skip-at=N] <cycles> [every] [out dir] [cycle:x,y[,button] ...]

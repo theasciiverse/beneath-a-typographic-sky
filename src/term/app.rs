@@ -50,6 +50,8 @@ pub struct TermHost {
     texts: Vec<TextOverlay>,
     last_snapshot: Instant,
     pub audio: bool,
+    /// --game-font: the game's own pixel fonts, no typed text over them
+    pub game_font: bool,
     /// the game pointer as a glyph: mouse cell and character
     pointer: Option<(u16, u16, char)>,
     /// set by SIGTERM, SIGHUP or SIGQUIT: quit (and so autosave) cleanly
@@ -73,6 +75,7 @@ impl TermHost {
             texts: Vec::new(),
             last_snapshot: Instant::now(),
             audio: true,
+            game_font: false,
             pointer: None,
             signalled: Default::default(),
         };
@@ -551,9 +554,12 @@ impl Host for TermHost {
             let cols = l.cols as usize;
             self.cells[r0 * cols..r1 * cols].copy_from_slice(&solid[r0 * cols..r1 * cols]);
         }
+        let game_font = self.game_font;
         self.texts = frame
             .texts
             .iter()
+            // with the game's fonts only the button labels are typed
+            .filter(|t| !game_font || t.boxed.is_some())
             .cloned()
             .map(|mut t| {
                 let i = t.color as usize * 3;
