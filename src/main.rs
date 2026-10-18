@@ -8,17 +8,35 @@ mod walk;
 
 use std::path::PathBuf;
 
-fn data_dir() -> PathBuf {
+/// Where the game data (sky.dsk, sky.dnr, sky.cpt) is looked for, in
+/// order: TYPOSKY_DATA; data/ beside the binary (the release archive);
+/// beside the binary; reference/bass-cd-1.2 (a development checkout).
+fn data_candidates() -> Vec<PathBuf> {
+    let mut c = Vec::new();
     if let Some(d) = std::env::var_os("TYPOSKY_DATA") {
-        return PathBuf::from(d);
+        c.push(PathBuf::from(d));
     }
-    PathBuf::from("reference/bass-cd-1.2")
+    if let Some(dir) = std::env::current_exe().ok().and_then(|e| e.canonicalize().ok()).and_then(|e| e.parent().map(PathBuf::from)) {
+        c.push(dir.join("data"));
+        c.push(dir);
+    }
+    c.push(PathBuf::from("reference/bass-cd-1.2"));
+    c
+}
+
+fn data_dir() -> PathBuf {
+    let c = data_candidates();
+    c.iter().find(|d| d.join("sky.dsk").is_file()).cloned().unwrap_or_else(|| c[0].clone())
 }
 
 fn play(args: &[String]) {
     let dir = data_dir();
     if !dir.join("sky.dsk").exists() {
-        eprintln!("typosky: no game data in {} (set TYPOSKY_DATA)", dir.display());
+        eprintln!("typosky: game data (sky.dsk, sky.dnr, sky.cpt) not found; looked in:");
+        for d in data_candidates() {
+            eprintln!("  {}", d.display());
+        }
+        eprintln!("set TYPOSKY_DATA to the folder that has them");
         std::process::exit(1);
     }
     let host = match term::app::TermHost::new() {

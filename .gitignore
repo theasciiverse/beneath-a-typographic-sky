@@ -1,5 +1,7 @@
-/target
-/reference/
-/out/
 /.claude/
+/dist/
 *.log
+/out/
+/reference/
+/stage/
+/target

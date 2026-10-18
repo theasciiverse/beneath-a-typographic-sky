@@ -136,7 +136,15 @@ licence (`readme.txt`, shipped beside it); see `NOTICE`.
   scene: `RUST_LOG=script=trace,mcode=trace` traces every script command
   and mcode call, and the walker's `vars`, `words`, `disasm`, `writes`
   and `seq` steps read variables, compacts and the script modules.
-- Data: `reference/bass-cd-1.2/` (gitignored), or `TYPOSKY_DATA`.
+- Data is looked for in `TYPOSKY_DATA`, then `data/` beside the binary
+  (the release layout), then beside the binary, then
+  `reference/bass-cd-1.2/` (gitignored, for development).
+- Packaging: `asciiverse/package.sh <target>` makes
+  `dist/beneath-a-typographic-sky-<target>.tar.gz` (.zip on Windows):
+  `typosky`, `data/` (sky.dsk, sky.dnr, sky.cpt and Revolution's
+  readme.txt, which the licence says must travel with them), `NOTICE`,
+  `LICENSE`. The data comes from `reference/bass-cd-1.2.zip` or is
+  downloaded from scummvm.org, sha256-checked either way. About 78 MB.
 - Session log: `RUST_LOG=debug typosky 2>typosky.log`.
 
 ## Rendering approach (original notes, 2026-10-03; see Status for what was built)
