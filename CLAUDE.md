@@ -113,6 +113,12 @@ included.
   .007, from the walkway to the first LINC entry). `--load=<save>
   --from=<line>` goes on from a save; `walkthrough/linc-ui.txt` tours the
   LINC's pixel interface from save 7.
+- Checked against ScummVM 2026.1 (2026-10-18): a click that starts
+  Foster's walk and then gives up when another character crosses his
+  path (Lamb after the ticket, room 20) is the original's behaviour;
+  ScummVM stops him at the same spot. Same click 8 s later: both leave
+  the room. `typosky trace <save> <x> <y> <button> <cycles> [at]` prints
+  Foster and Lamb per cycle after one click.
 - Data: `reference/bass-cd-1.2/` (gitignored), or `TYPOSKY_DATA`.
 - Session log: `RUST_LOG=debug typosky 2>typosky.log`.
 

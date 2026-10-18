@@ -520,3 +520,45 @@ pub fn glyphs(dir: &Path, args: &[String]) {
     enc.set_depth(png::BitDepth::Eight);
     enc.write_header().unwrap().write_image_data(&flat).unwrap();
 }
+
+/// `typosky trace <save> <x> <y> <button> <cycles>`: restores a save,
+/// clicks once and prints Foster's logic every cycle.
+pub fn trace(dir: &Path, args: &[String]) {
+    use crate::engine::defs::*;
+    use crate::engine::host::Headless;
+    use crate::engine::sky::{f, Sky};
+    let arg = |i: usize| args.get(i).map(String::as_str).unwrap_or_else(|| fail("trace <save> <x> <y> <button> <cycles>"));
+    let mut sky = Sky::new(dir, Box::new(Headless::new())).unwrap();
+    sky.start(true);
+    let data = fs::read(arg(0)).unwrap();
+    sky.restore_data(&data).unwrap();
+    let (x, y, b): (u16, u16, u8) = (arg(1).parse().unwrap(), arg(2).parse().unwrap(), arg(3).parse().unwrap());
+    let cycles: u32 = arg(4).parse().unwrap();
+    // optional sixth argument: the cycle to click at (default 3)
+    let at: u32 = args.get(5).and_then(|s| s.parse().ok()).unwrap_or(3);
+    for n in 0..cycles {
+        if n + 3 >= at && n <= at {
+            sky.mouse_moved(x, y);
+        }
+        if n == at {
+            sky.mouse.button_pressed(b);
+        }
+        sky.tick();
+        sky.delay(80);
+        let c = sky.cpt_start(ID_FOSTER);
+        let g = |fld| sky.g(c, fld);
+        println!(
+            "{n:4} room {:3} logic {:2} mode {:2} at {},{} dir {} sub {:#06x}:{} {:#06x}:{} {:#06x}:{} waiting {} ar {},{} down {} gp {:#06x}:{}",
+            sky.vars[SCREEN as usize], g(f::LOGIC), g(f::MODE), g(f::XCOOD), g(f::YCOOD), g(f::DIR),
+            g(f::BASE_SUB), g(f::BASE_SUB_OFF), g(f::ACTION_SUB), g(f::ACTION_SUB_OFF), g(f::GET_TO_SUB), g(f::GET_TO_SUB_OFF),
+            g(f::WAITING_FOR), g(f::AR_TARGET_X), g(f::AR_TARGET_Y), g(f::DOWN_FLAG), g(f::GRAFIX_PROG_ID), g(f::GRAFIX_PROG_POS)
+        );
+        let l = sky.cpt_start(ID_LAMB);
+        let ms = sky.mega_set(l);
+        println!(
+            "     lamb room {} logic {} at {},{} status {:#x} mood {} dir {} megaset {} col_off {} col_w {} last {}",
+            sky.g(l, f::SCREEN), sky.g(l, f::LOGIC), sky.g(l, f::XCOOD), sky.g(l, f::YCOOD), sky.g(l, f::STATUS),
+            sky.g(l, f::MOOD), sky.g(l, f::DIR), sky.g(l, f::MEGA_SET), sky.w(ms + 1), sky.w(ms + 2), sky.w(ms + 3)
+        );
+    }
+}
