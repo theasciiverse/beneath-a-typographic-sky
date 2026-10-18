@@ -3,15 +3,16 @@
 Asciiverse point-and-click adventure. Rust + Ratatui.
 Terminal take on Revolution Software's Beneath a Steel Sky (1994).
 
-**Status (2026-10-17):** playable. A Rust port of ScummVM's sky engine
-runs the original CD data (v0.0372) and draws it in the terminal:
-truecolour Braille (160x50 cells, one dot per game pixel) or half blocks
-on terminals of 320x100 and up (F2 switches), game text set as real type
-over the picture, mouse through the terminal. Sound effects, speech and
-AdLib music (Nuked OPL3) are connected. Checked headless: the opening
-plays through (take the rung, pry the door, the guard's lines, room 1).
-The intro is being ported; until then the game starts at the restart
-point. Own git repo, private at github.com/theasciiverse/beneath-a-typographic-sky
+**Status (2026-10-18):** playable from the intro to the end credits. A
+Rust port of ScummVM's sky engine runs the original CD data (v0.0372)
+and draws it in the terminal: truecolour Braille (160x50 cells, one dot
+per game pixel), half blocks or quadrants (F2 cycles), game text set as
+real type over the picture, mouse through the terminal. Sound effects,
+speech, AdLib music (Nuked OPL3) and the CD intro are in. A headless
+walkthrough plays the whole game (`walkthrough/`), with saves at 23
+story points. Packaging works (`asciiverse/package.sh`); macOS and
+Windows builds, the hub entry and the preview cast are still to do.
+Own git repo, private at github.com/theasciiverse/beneath-a-typographic-sky
 (branch main, pushed 2026-10-18).
 
 ## Name
