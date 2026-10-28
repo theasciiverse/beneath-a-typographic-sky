@@ -11,9 +11,6 @@ av install beneath-a-typographic-sky
 av play beneath-a-typographic-sky
 ```
 
-Or download the archive for your system from this repository's Releases,
-unpack it and run `./typosky`.
-
 ## Credits
 
 Revolution Software made Beneath a Steel Sky in 1994 and released it as
