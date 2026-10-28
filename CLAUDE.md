@@ -11,7 +11,8 @@ real type over the picture, mouse through the terminal. Sound effects,
 speech, AdLib music (Nuked OPL3) and the CD intro are in. A headless
 walkthrough plays the whole game (`walkthrough/`), with saves at 23
 story points. Packaging works (`asciiverse/package.sh`); macOS and
-Windows builds, the hub entry and the preview cast are still to do.
+Windows builds are still to do; the hub entry and the preview cast are done.
+Version 0.9.0 (2026-10-28). What comes next is in `ROADMAP.md`.
 Own git repo, private at github.com/theasciiverse/beneath-a-typographic-sky
 (branch main, pushed 2026-10-18).
 
@@ -202,6 +203,6 @@ vector polygons.
 - [x] Use ScummVM's engine (GPL): ported to Rust, so the crate is GPL-3
 - [x] Voice/audio: kept; speech, effects and AdLib music play (--mute off)
 - [ ] Check the port against ScummVM frame by frame on a few scenes
-- [ ] Packaging, preview cast, hub manifest
+- [x] Packaging, preview cast, hub manifest
 - [ ] Name collision check before public announcement
 - [ ] Add to the Asciiverse outreach CLAUDE.md
