@@ -1,0 +1,143 @@
+# Asciiverse release workflow (tag v* or run by hand with a tag)
+#
+# Builds Beneath a Typographic Sky for the Asciiverse catalog: one archive
+# per target, named <id>-<target>.tar.gz (Linux, macOS) or .zip (Windows),
+# plus a SHA256SUMS file, attached to a GitHub release (hub/catalog/
+# SCHEMA.md, release.source = "github").
+#
+# Each archive is packed by asciiverse/package.sh: the binary, data/ with
+# Revolution's freeware Beneath a Steel Sky CD data (downloaded from
+# ScummVM's site and checked against its sha256), its readme.txt, NOTICE
+# and LICENSE. Linux builds are glibc, built on Ubuntu 22.04 (glibc 2.35
+# and newer): sound goes through rodio's ALSA output, linked dynamically,
+# so the binary needs libasound2 (the manifest's system_deps). macOS and
+# Windows use rodio's own output (Core Audio, WASAPI). Adapted from 1D-Pong's.
+
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "existing tag to build and release"
+        required: true
+
+env:
+  ID: beneath-a-typographic-sky
+  BIN: typosky
+  TAG: ${{ inputs.tag || github.ref_name }}
+
+permissions:
+  contents: write
+
+jobs:
+  linux:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { target: x86_64-unknown-linux-gnu, runner: ubuntu-22.04 }
+          - { target: aarch64-unknown-linux-gnu, runner: ubuntu-22.04-arm }
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TAG }}
+
+      - name: Build
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libasound2-dev pkg-config unzip
+          rustup update stable && rustup default stable
+          cargo build --release --locked
+          file target/release/$BIN
+          # libc, libm, libgcc_s, and the one the manifest declares
+          ldd target/release/$BIN
+          ! ldd target/release/$BIN | grep -v -E 'linux-vdso|libc\.so|libm\.so|libgcc_s|ld-linux|libasound'
+
+      - name: Package for av
+        run: sh asciiverse/package.sh ${{ matrix.target }}
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.target }}
+          path: dist/*
+
+  macos:
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [x86_64-apple-darwin, aarch64-apple-darwin]
+    runs-on: macos-15
+    env:
+      MACOSX_DEPLOYMENT_TARGET: "11.0"
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TAG }}
+
+      - name: Build
+        run: |
+          rustup update stable && rustup default stable
+          rustup target add ${{ matrix.target }}
+          cargo build --release --locked --target ${{ matrix.target }}
+          file target/${{ matrix.target }}/release/$BIN
+
+      - name: Package for av
+        run: sh asciiverse/package.sh ${{ matrix.target }}
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.target }}
+          path: dist/*
+
+  windows:
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [x86_64-pc-windows-msvc, aarch64-pc-windows-msvc]
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TAG }}
+
+      - name: Build
+        shell: bash
+        run: |
+          rustup update stable && rustup default stable
+          rustup target add ${{ matrix.target }}
+          cargo build --release --locked --target ${{ matrix.target }}
+
+      - name: Package for av
+        shell: bash
+        run: sh asciiverse/package.sh ${{ matrix.target }}
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.target }}
+          path: dist/*
+
+  release:
+    needs: [linux, macos, windows]
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Checksums
+        working-directory: dist
+        run: sha256sum * > SHA256SUMS && cat SHA256SUMS
+
+      - name: Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release view "$TAG" -R "$GITHUB_REPOSITORY" >/dev/null 2>&1 \
+            || gh release create "$TAG" -R "$GITHUB_REPOSITORY" --title "Beneath a Typographic Sky $TAG" \
+                 --notes "Beneath a Typographic Sky: Revolution's 1994 adventure Beneath a Steel Sky, played in the terminal, with its freeware game data. Its README lists the controls and options."
+          gh release upload "$TAG" dist/* -R "$GITHUB_REPOSITORY" --clobber

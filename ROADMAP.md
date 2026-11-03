@@ -13,6 +13,14 @@ from the intro to the end credits. 1.0.0 is when the items below are done.
   story points
 - [x] Packaging, the preview cast, the catalog entry
 
+## 0.9.1: built
+
+- [x] Release workflow: Linux (glibc, x86_64 and ARM64), macOS (Intel and
+  Apple Silicon) and Windows (x64 and ARM64), each packed by
+  asciiverse/package.sh with the game data
+- [x] package.sh runs on GitHub's builders: 7-Zip where zip and unzip are
+  missing (Windows), no strip for MSVC builds, a native strip on ARM Linux
+
 ## 1.0.0
 
 - [ ] The port checked against ScummVM frame by frame on a few scenes

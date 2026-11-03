@@ -1,6 +1,6 @@
 [package]
 name = "typographic-sky"
-version = "0.9.0"
+version = "0.9.1"
 edition = "2021"
 description = "Asciiverse port of Revolution Software's Beneath a Steel Sky (1994), the city rebuilt out of characters"
 license = "GPL-3.0-or-later"
